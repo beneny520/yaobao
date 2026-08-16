@@ -1,0 +1,14 @@
+{
+  "name": "yaobao-tools",
+  "version": "1.0.0",
+  "private": true,
+  "description": "药宝的构建/验证脚本。主应用仍是单文件 clay-buddy.html，不依赖任何打包。",
+  "scripts": {
+    "preview": "node build-pet-preview.js",
+    "verify": "node check-syntax.js && node build-pet-preview.js && node verify-pets.js"
+  },
+  "dependencies": {
+    "@babel/standalone": "^7.24.0",
+    "three": "0.128.0"
+  }
+}

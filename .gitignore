@@ -1,0 +1,25 @@
+# 本地工具与凭据
+.claude/
+.wrangler/
+node_modules/
+
+# 文档产物（不进仓库）
+药宝-项目完整说明*
+_doc_assets/
+_doc_build/
+
+# 不进仓库的项目资料
+PRD.md
+docs/
+video/
+
+# 页面存档（非项目代码）
+opc_aliyun/
+
+# 视频渲染产物与帧素材（可由脚本重新生成）
+video/out/
+video/public/
+
+# 临时测试文件
+test.png
+test.wav

@@ -1,0 +1,3647 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PillPal 药宝 - 黏土小伴侣</title>
+  <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@19.2.0",
+        "react/": "https://esm.sh/react@19.2.0/",
+        "react-dom/client": "https://esm.sh/react-dom@19.2.0/client",
+        "lucide-react": "https://esm.sh/lucide-react@0.469.0?deps=react@19.2.0",
+        "framer-motion": "https://esm.sh/framer-motion@11.0.8?deps=react@19.2.0",
+        "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.45.4"
+      }
+    }
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Three.js Library for high-fidelity 3D clay pet render (jsDelivr: 国内节点更稳定) -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300..700&family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+
+  <!-- 微信内置浏览器引导：微信不给网页麦克风/相机权限，语音陪伴、拍照识别须在系统浏览器使用。
+       独立脚本，不依赖 React，检测到微信才注入可关闭的顶部横幅。 -->
+  <script>
+    (function () {
+      if (!/MicroMessenger/i.test(navigator.userAgent || "")) return;
+      var done = false;
+      function mount() {
+        if (done || !document.body) return;
+        done = true;
+        var bar = document.createElement("div");
+        bar.style.cssText = [
+          "position:fixed", "top:0", "left:0", "right:0", "z-index:99999",
+          "background:#FFECE6", "border-bottom:2px solid #F79B83",
+          "padding:10px 14px", "box-shadow:0 2px 8px rgba(0,0,0,.08)",
+          "font-family:'Fredoka','Noto Sans SC',sans-serif",
+          "display:flex", "align-items:center", "gap:10px"
+        ].join(";");
+        var ico = document.createElement("span");
+        ico.textContent = "🎙️"; ico.style.fontSize = "22px";
+        var txt = document.createElement("span");
+        txt.style.cssText = "flex:1;font-size:13.5px;line-height:1.45;color:#7a4a35";
+        txt.innerHTML = "<b>语音 / 拍照请在浏览器打开</b><br>点右上角 <b>···</b> → 「在浏览器中打开」（iPhone 选「在 Safari 中打开」）";
+        var close = document.createElement("span");
+        close.textContent = "×";
+        close.style.cssText = "font-size:22px;color:#b07a5a;padding:0 4px;cursor:pointer;line-height:1";
+        close.addEventListener("click", function () { bar.remove(); });
+        bar.appendChild(ico); bar.appendChild(txt); bar.appendChild(close);
+        document.body.insertBefore(bar, document.body.firstChild);
+      }
+      if (document.body) mount();
+      else document.addEventListener("DOMContentLoaded", mount);
+    })();
+  </script>
+
+  <style>
+    /* Clay design tokens */
+    :root {
+      --clay-bg: #EEF1F6;
+      --clay-accent: #F79B83;
+      --clay-accent-light: #FFECE6;
+      --font-display: 'Fredoka', 'Noto Sans SC', sans-serif;
+    }
+
+    body {
+      background-color: var(--clay-bg);
+      font-family: var(--font-display);
+      user-select: none;
+      overflow-x: hidden;
+    }
+
+    /* Soft Claymorphism UI shadows and inner highlights */
+    .clay-surface-soft {
+      background: #FFFFFF;
+      border-radius: 28px;
+      box-shadow: 
+        0 12px 32px -4px rgba(180, 190, 210, 0.4),
+        inset 0 -6px 12px rgba(160, 175, 205, 0.2),
+        inset 0 4px 8px rgba(255, 255, 255, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+    }
+
+    .clay-surface-sunken {
+      background: #F4F6FA;
+      border-radius: 20px;
+      box-shadow: 
+        inset 0 6px 12px -2px rgba(160, 175, 205, 0.3),
+        inset 0 -2px 6px rgba(255, 255, 255, 0.8),
+        0 2px 4px rgba(255, 255, 255, 0.4);
+      border: 1px solid rgba(220, 226, 236, 0.5);
+    }
+
+    .clay-btn-primary {
+      background: linear-gradient(135deg, #FCA18B 0%, #F79B83 100%);
+      border-radius: 20px;
+      color: white;
+      box-shadow: 
+        0 8px 20px -4px rgba(247, 155, 131, 0.5),
+        inset 0 -6px 8px rgba(0, 0, 0, 0.15),
+        inset 0 4px 8px rgba(255, 255, 255, 0.3);
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+      transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .clay-btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 
+        0 12px 24px -4px rgba(247, 155, 131, 0.6),
+        inset 0 -6px 8px rgba(0, 0, 0, 0.15),
+        inset 0 4px 8px rgba(255, 255, 255, 0.3);
+    }
+
+    .clay-btn-primary:active {
+      transform: translateY(2px);
+      box-shadow: 
+        0 4px 10px -2px rgba(247, 155, 131, 0.5),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.15),
+        inset 0 2px 4px rgba(255, 255, 255, 0.3);
+    }
+
+    .clay-btn-secondary {
+      background: #FFFFFF;
+      border-radius: 20px;
+      box-shadow: 
+        0 6px 16px -4px rgba(180, 190, 210, 0.3),
+        inset 0 -4px 6px rgba(160, 175, 205, 0.15),
+        inset 0 3px 6px rgba(255, 255, 255, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      transition: all 0.2s ease;
+    }
+
+    .clay-btn-secondary:hover {
+      transform: translateY(-1px);
+      box-shadow: 
+        0 8px 20px -4px rgba(180, 190, 210, 0.4),
+        inset 0 -4px 6px rgba(160, 175, 205, 0.15);
+    }
+
+    /* Soft scrollbar for layout rules */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #CBD5E1;
+      border-radius: 3px;
+    }
+
+    /* Floating bubble animation for Clay context */
+    @keyframes floating {
+      0%, 100% { transform: translateY(0px) rotate(0deg); }
+      50% { transform: translateY(-10px) rotate(2deg); }
+    }
+    .clay-float {
+      animation: floating 4s ease-in-out infinite;
+    }
+    .clay-float-delayed {
+      animation: floating 4.5s ease-in-out infinite;
+      animation-delay: 1.5s;
+    }
+
+    .clay-input-soft {
+      background: #F8FAFC;
+      border-radius: 18px;
+      border: 1px solid rgba(226, 232, 240, 0.8);
+      box-shadow:
+        inset 0 4px 10px rgba(160, 175, 205, 0.16),
+        inset 0 -2px 6px rgba(255, 255, 255, 0.9);
+    }
+
+    @keyframes clay-sick {
+      0%, 100% { transform: translateY(0) rotate(-2deg); filter: saturate(.72); }
+      50% { transform: translateY(4px) rotate(2deg); filter: saturate(.55); }
+    }
+
+    /* 睡着了，不是死掉了。PRD §6.3：小动物永不死亡，最差状态始终可被一次服药唤醒。
+       原先这里是 grayscale(1) opacity(.58) 的「尸体」表现，对独居老人是负担而非激励。 */
+    @keyframes clay-sleeping {
+      0%, 100% { transform: translateY(0) rotate(0deg) scale(.99); filter: saturate(.8); }
+      50% { transform: translateY(3px) rotate(-1deg) scale(.97); filter: saturate(.75); }
+    }
+
+    .pet-float { animation: floating 3.8s ease-in-out infinite; }
+    .pet-sick { animation: clay-sick 1.8s ease-in-out infinite; }
+    .pet-sleeping { animation: clay-sleeping 3.2s ease-in-out infinite; }
+
+    @media (max-width: 640px) {
+      .mobile-safe-shell {
+        min-height: 100svh;
+      }
+      .mobile-card-scroll {
+        max-height: none;
+      }
+    }
+
+    /* 高对比模式（Task #6，默认关闭）：只在 body.yb-hc 时叠加，
+       不改动原配色主题，只把偏浅的辅助灰字压深、描边加重，提升老年可读性。 */
+    body.yb-hc .text-slate-400 { color: #334155 !important; }
+    body.yb-hc .text-slate-500 { color: #1e293b !important; }
+    body.yb-hc .text-amber-700 { color: #78350f !important; }
+    body.yb-hc .border { border-color: #94a3b8 !important; }
+    body.yb-hc .border-2 { border-color: #64748b !important; }
+    body.yb-hc .border-slate-100,
+    body.yb-hc .border-slate-200,
+    body.yb-hc .border-rose-100 { border-color: #94a3b8 !important; }
+    body.yb-hc .font-bold { font-weight: 800 !important; }
+  </style>
+</head>
+<body class="min-h-screen text-slate-800 antialiased flex flex-col justify-between">
+
+  <div id="root"></div>
+
+  <script type="text/babel" data-type="module">
+    import React, { useState, useEffect, useRef, useMemo } from "react";
+    import { createRoot } from "react-dom/client";
+    import { createClient } from "@supabase/supabase-js";
+    import { 
+      Calendar, Clock, Heart, Shield, Plus, HeartHandshake, User, Settings,
+      Activity, Users, ClipboardCheck, ArrowRight, Pill, Smile, PlusCircle,
+      Bell, MessageSquare, Sparkles, ChevronRight, CheckCircle2, RotateCcw, Home,
+      Trash2, Share2, Stethoscope, ChevronDown, Menu, X, Trophy, PawPrint
+    } from "lucide-react";
+
+    // ======================================================================
+    // 黏土宠物 3D 建模工具箱
+    // 材质与灯光严格沿用原版（PRD §11.3），六种动物仅以「几何形态 + 局部配色」
+    // 区分物种，保证是同一套美术体系。
+    // ======================================================================
+
+    // 每种动物的配色：body 主体黏土 / accent 品牌蜜桃色（耳内·鼻子·脚掌，
+    // 全员共用以保持家族感）/ alt 物种辅色（吻部·肚皮·尾尖）
+    // fit：整体缩放，保证挤压拉伸到 1.15 倍时仍不出画（兔子耳朵最长，缩得多一点）
+    const PET_SPECS = {
+      bunny:   { emoji: '🐰', body: 0xfffcf7, accent: 0xf79b83, alt: 0xfff1ea, fit: 0.88 },
+      bear:    { emoji: '🐻', body: 0xfaeacd, accent: 0xf79b83, alt: 0xffdcb0, fit: 0.92 },
+      cat:     { emoji: '🐱', body: 0xffe4cc, accent: 0xf79b83, alt: 0xfffcf7, fit: 0.92 },
+      dog:     { emoji: '🐶', body: 0xfffcf7, accent: 0xf79b83, alt: 0xcfe6f5, fit: 0.94 },
+      penguin: { emoji: '🐧', body: 0xaebbd6, accent: 0xf79b83, alt: 0xfffcf7, fit: 0.92 },
+      fox:     { emoji: '🦊', body: 0xffc9a5, accent: 0xf79b83, alt: 0xfffcf7, fit: 0.92 },
+    };
+
+    // 原版黏土材质参数，不得改动
+    const makeClayMat = (color) => new THREE.MeshStandardMaterial({
+      color, roughness: 0.95, metalness: 0.05, flatShading: false,
+    });
+
+    // 相机机位：透视相机的 fov 是竖直方向的，容器越窄横向可视范围越小。
+    // 吃药动画会瞬间压扁到 0.55，横向被放大到 1.45 倍，此时狐狸尾巴/猫尾会顶出画面。
+    // 所以容器竖长（aspect<1）时把相机往后拉，保证横向永远不窄于正方形时的取景。
+    const CAM_Z = 7.5;
+    const cameraZ = (aspect) => CAM_Z / Math.min(1, aspect || 1);
+
+    // 底部加胖的球——原版兔子头的手法，是黏土「坐感」的来源
+    function plumpSphere(r, fatten = 1.15, seg = 40) {
+      const g = new THREE.SphereGeometry(r, seg, seg);
+      const p = g.attributes.position;
+      for (let i = 0; i < p.count; i++) {
+        if (p.getY(i) < 0) { p.setX(i, p.getX(i) * fatten); p.setZ(i, p.getZ(i) * fatten); }
+      }
+      g.computeVertexNormals();
+      return g;
+    }
+
+    // 椭球——四肢、躯干、肚皮的通用积木
+    function blob(mat, sx, sy, sz, x = 0, y = 0, z = 0) {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(1, 28, 28), mat);
+      m.scale.set(sx, sy, sz);
+      m.position.set(x, y, z);
+      return m;
+    }
+
+    // 记录初始姿态，供动画在其基础上叠加偏移
+    function pivot(x, y, z, rz = 0, rx = 0) {
+      const g = new THREE.Group();
+      g.position.set(x, y, z);
+      g.rotation.z = rz;
+      g.rotation.x = rx;
+      g.userData.base = { rx, rz };
+      g.userData.cur = rx;   // 动画中的平滑基线，与叠加的正弦抖动分开存
+      return g;
+    }
+
+    // 亮黑眼珠 + 蜜桃腮红，六种动物统一
+    function addFace(head, mats, eyeR, ex, ey, ez, cheekR, cx, cy, cz) {
+      const eyeGeo = new THREE.SphereGeometry(eyeR, 24, 24);
+      const eyeL = new THREE.Mesh(eyeGeo, mats.eye); eyeL.position.set(-ex, ey, ez);
+      const eyeR2 = new THREE.Mesh(eyeGeo, mats.eye); eyeR2.position.set(ex, ey, ez);
+      head.add(eyeL, eyeR2);
+      if (cheekR > 0) {
+        const cGeo = new THREE.SphereGeometry(cheekR, 20, 14);
+        const cL = new THREE.Mesh(cGeo, mats.cheek); cL.position.set(-cx, cy, cz);
+        const cR = new THREE.Mesh(cGeo, mats.cheek); cR.position.set(cx, cy, cz);
+        head.add(cL, cR);
+      }
+      return [eyeL, eyeR2];
+    }
+
+    // ---------------------------------------------------------------- 兔兔·糖包
+    function buildBunny(mats) {
+      const g = new THREE.Group();
+      const head = new THREE.Group(); head.position.y = 0.62; g.add(head);
+      head.add(new THREE.Mesh(plumpSphere(1.15), mats.body));
+
+      const ears = [-1, 1].map((s) => {
+        // 长耳是兔子的识别特征，但拉伸帧会顶出画面，所以比原版略收短
+        const p = pivot(s * 0.46, 0.66, -0.08, s * -0.15, -0.1);
+        const ear = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.34, 1.35, 24), mats.body);
+        ear.position.y = 0.66;
+        const inner = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.18, 1.1, 20), mats.accent);
+        inner.position.set(0, 0.66, 0.14);
+        p.add(ear, inner); head.add(p); return p;
+      });
+
+      const nose = new THREE.Mesh(new THREE.SphereGeometry(0.09, 16, 16), mats.accent);
+      nose.position.set(0, -0.2, 1.1); head.add(nose);
+      const eyes = addFace(head, mats, 0.115, 0.4, 0.02, 1.04, 0.2, 0.6, -0.3, 0.95);
+
+      g.add(blob(mats.body, 1.0, 0.92, 0.85, 0, -0.85, 0));
+      const arms = [-1, 1].map((s) => {
+        const p = pivot(s * 0.9, -0.62, 0.18, s * 0.22);
+        p.add(blob(mats.body, 0.24, 0.4, 0.24, 0, -0.34, 0));
+        g.add(p); return p;
+      });
+      [-1, 1].forEach((s) => g.add(blob(mats.body, 0.4, 0.26, 0.54, s * 0.52, -1.6, 0.26)));
+      g.add(blob(mats.body, 0.3, 0.3, 0.28, 0, -1.0, -0.86));   // 团子尾巴
+      return { group: g, head, ears, arms, eyes, tail: null, wings: [] };
+    }
+
+    // ---------------------------------------------------------------- 小熊·奶酪熊
+    function buildBear(mats) {
+      const g = new THREE.Group();
+      const head = new THREE.Group(); head.position.y = 0.58; g.add(head);
+      head.add(new THREE.Mesh(plumpSphere(1.18, 1.1), mats.body));
+
+      const ears = [-1, 1].map((s) => {
+        const p = pivot(s * 0.82, 0.78, -0.12);
+        const ear = new THREE.Mesh(new THREE.SphereGeometry(0.32, 22, 22), mats.body);
+        const inner = new THREE.Mesh(new THREE.SphereGeometry(0.18, 18, 18), mats.accent);
+        inner.position.z = 0.16; inner.scale.z = 0.6;
+        p.add(ear, inner); head.add(p); return p;
+      });
+
+      head.add(blob(mats.alt, 0.48, 0.34, 0.34, 0, -0.44, 0.92));  // 吻部
+      const nose = new THREE.Mesh(new THREE.SphereGeometry(0.15, 18, 18), mats.accent);
+      nose.position.set(0, -0.34, 1.22); head.add(nose);
+      const eyes = addFace(head, mats, 0.12, 0.4, 0.08, 1.06, 0.19, 0.68, -0.24, 0.9);
+
+      g.add(blob(mats.body, 1.12, 0.98, 0.92, 0, -0.95, 0));
+      g.add(blob(mats.alt, 0.62, 0.52, 0.3, 0, -0.92, 0.78));       // 肚皮
+      const arms = [-1, 1].map((s) => {
+        const p = pivot(s * 1.0, -0.72, 0.14, s * 0.26);
+        p.add(blob(mats.body, 0.3, 0.46, 0.3, 0, -0.38, 0));
+        g.add(p); return p;
+      });
+      [-1, 1].forEach((s) => g.add(blob(mats.body, 0.44, 0.34, 0.54, s * 0.58, -1.68, 0.22)));
+      g.add(blob(mats.body, 0.22, 0.22, 0.2, 0, -1.24, -0.92));
+      return { group: g, head, ears, arms, eyes, tail: null, wings: [] };
+    }
+
+    // ---------------------------------------------------------------- 小猫·小甜橘
+    function buildCat(mats) {
+      const g = new THREE.Group();
+      const head = new THREE.Group(); head.position.y = 0.66; g.add(head);
+      const skull = new THREE.Mesh(plumpSphere(1.08, 1.12), mats.body);
+      skull.scale.x = 1.06; head.add(skull);
+
+      const ears = [-1, 1].map((s) => {                              // 三角立耳
+        const p = pivot(s * 0.6, 0.78, -0.04, s * -0.2);
+        const ear = new THREE.Mesh(new THREE.ConeGeometry(0.33, 0.6, 4), mats.body);
+        ear.position.y = 0.26; ear.rotation.y = Math.PI / 4;
+        const inner = new THREE.Mesh(new THREE.ConeGeometry(0.19, 0.38, 4), mats.accent);
+        inner.position.set(0, 0.22, 0.1); inner.rotation.y = Math.PI / 4;
+        p.add(ear, inner); head.add(p); return p;
+      });
+
+      [-1, 1].forEach((s) => head.add(blob(mats.alt, 0.26, 0.2, 0.18, s * 0.19, -0.42, 0.92)));
+      const nose = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.12, 3), mats.accent);
+      nose.position.set(0, -0.26, 1.06); nose.rotation.x = Math.PI; head.add(nose);
+      [-1, 1].forEach((s) => [0.06, -0.06].forEach((dy) => {         // 胡须
+        const w = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.8, 6), mats.eye);
+        w.position.set(s * 0.62, -0.36 + dy, 0.78); w.rotation.z = Math.PI / 2 + s * 0.12;
+        head.add(w);
+      }));
+      const eyes = addFace(head, mats, 0.13, 0.42, 0.04, 0.98, 0.19, 0.66, -0.28, 0.86);
+
+      g.add(blob(mats.body, 0.86, 0.94, 0.8, 0, -0.9, 0));
+      const arms = [-1, 1].map((s) => {
+        const p = pivot(s * 0.42, -1.32, 0.42);
+        p.add(blob(mats.body, 0.22, 0.28, 0.32, 0, -0.22, 0));
+        g.add(p); return p;
+      });
+      [-1, 1].forEach((s) => g.add(blob(mats.body, 0.34, 0.4, 0.42, s * 0.68, -1.3, -0.04)));
+
+      // 长尾逐节收细，并向侧后方扬起——正面也要看得见，否则少了一个识别特征
+      const tail = pivot(0.46, -1.02, -0.52, -0.46, -0.18);
+      [0, 1, 2, 3, 4].forEach((i) => {
+        const r = 0.2 - i * 0.022;
+        const seg = new THREE.Mesh(new THREE.SphereGeometry(r, 18, 18), i === 4 ? mats.alt : mats.body);
+        seg.position.set(0, i * 0.34, -i * 0.1);
+        tail.add(seg);
+      });
+      g.add(tail);
+      return { group: g, head, ears, arms, eyes, tail, wings: [] };
+    }
+
+    // ---------------------------------------------------------------- 小狗·糯米
+    function buildDog(mats) {
+      const g = new THREE.Group();
+      const head = new THREE.Group(); head.position.y = 0.62; g.add(head);
+      head.add(new THREE.Mesh(plumpSphere(1.14), mats.body));
+
+      const ears = [-1, 1].map((s) => {                              // 垂耳
+        const p = pivot(s * 0.88, 0.34, 0.02, s * 0.3);
+        const ear = blob(mats.alt, 0.28, 0.56, 0.16, 0, -0.5, 0);
+        p.add(ear); head.add(p); return p;
+      });
+
+      head.add(blob(mats.body, 0.4, 0.32, 0.44, 0, -0.36, 0.94));    // 吻部
+      const nose = new THREE.Mesh(new THREE.SphereGeometry(0.14, 18, 18), mats.accent);
+      nose.position.set(0, -0.3, 1.36); head.add(nose);
+      const mouth = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.028, 8, 20, Math.PI), mats.eye);
+      mouth.position.set(0, -0.5, 1.2); mouth.rotation.z = Math.PI; head.add(mouth);
+      const eyes = addFace(head, mats, 0.12, 0.4, 0.1, 1.04, 0.2, 0.66, -0.24, 0.9);
+
+      g.add(blob(mats.body, 0.94, 0.9, 0.85, 0, -0.9, 0));
+      g.add(blob(mats.alt, 0.5, 0.44, 0.26, 0, -0.82, 0.74));
+      const arms = [-1, 1].map((s) => {
+        const p = pivot(s * 0.48, -1.3, 0.4);
+        p.add(blob(mats.body, 0.24, 0.3, 0.32, 0, -0.24, 0));
+        g.add(p); return p;
+      });
+      [-1, 1].forEach((s) => g.add(blob(mats.body, 0.3, 0.34, 0.36, s * 0.62, -1.42, -0.18)));
+
+      const tail = pivot(0.2, -0.8, -0.68, -0.4, 0.45);              // 摇尾巴，稍偏侧向便于正面看见
+      tail.add(blob(mats.body, 0.15, 0.42, 0.15, 0, 0.38, 0));
+      g.add(tail);
+      return { group: g, head, ears, arms, eyes, tail, wings: [] };
+    }
+
+    // ---------------------------------------------------------------- 企鹅·冰豆
+    function buildPenguin(mats) {
+      const g = new THREE.Group();
+      const head = new THREE.Group(); head.position.y = 0.6; g.add(head);
+      head.add(new THREE.Mesh(plumpSphere(1.0, 1.18), mats.body));
+      head.add(blob(mats.alt, 0.6, 0.66, 0.34, 0, -0.08, 0.72));     // 白脸
+
+      const beak = new THREE.Mesh(new THREE.ConeGeometry(0.19, 0.4, 16), mats.accent);
+      beak.position.set(0, -0.22, 0.98); beak.rotation.x = Math.PI / 2; head.add(beak);
+      const eyes = addFace(head, mats, 0.115, 0.3, 0.14, 0.98, 0.16, 0.56, -0.2, 0.78);
+
+      g.add(blob(mats.body, 0.98, 1.12, 0.88, 0, -0.9, 0));
+      g.add(blob(mats.alt, 0.68, 0.9, 0.42, 0, -0.9, 0.6));          // 白肚皮
+      const wings = [-1, 1].map((s) => {                             // 翅膀
+        const p = pivot(s * 0.9, -0.62, 0, s * 0.18);
+        p.add(blob(mats.body, 0.16, 0.58, 0.38, 0, -0.5, 0));
+        g.add(p); return p;
+      });
+      [-1, 1].forEach((s) => g.add(blob(mats.accent, 0.32, 0.12, 0.42, s * 0.4, -1.92, 0.32)));
+      return { group: g, head, ears: [], arms: [], eyes, tail: null, wings };
+    }
+
+    // ---------------------------------------------------------------- 狐狸·莓莓
+    function buildFox(mats) {
+      const g = new THREE.Group();
+      const head = new THREE.Group(); head.position.y = 0.66; g.add(head);
+      head.add(new THREE.Mesh(plumpSphere(1.06, 1.1), mats.body));
+
+      const ears = [-1, 1].map((s) => {                              // 大尖耳
+        const p = pivot(s * 0.62, 0.76, -0.06, s * -0.22);
+        const ear = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.78, 4), mats.body);
+        ear.position.y = 0.36; ear.rotation.y = Math.PI / 4;
+        const inner = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.5, 4), mats.accent);
+        inner.position.set(0, 0.32, 0.1); inner.rotation.y = Math.PI / 4;
+        p.add(ear, inner); head.add(p); return p;
+      });
+
+      const snout = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.66, 20), mats.alt);
+      snout.position.set(0, -0.36, 0.96); snout.rotation.x = Math.PI / 2; head.add(snout);
+      const nose = new THREE.Mesh(new THREE.SphereGeometry(0.11, 16, 16), mats.accent);
+      nose.position.set(0, -0.36, 1.3); head.add(nose);
+      const eyes = addFace(head, mats, 0.12, 0.42, 0.08, 0.95, 0.18, 0.66, -0.22, 0.82);
+
+      g.add(blob(mats.body, 0.88, 0.9, 0.8, 0, -0.9, 0));
+      g.add(blob(mats.alt, 0.52, 0.46, 0.28, 0, -0.66, 0.7));        // 白胸毛
+      const arms = [-1, 1].map((s) => {
+        const p = pivot(s * 0.44, -1.3, 0.4);
+        p.add(blob(mats.body, 0.21, 0.3, 0.3, 0, -0.24, 0));
+        g.add(p); return p;
+      });
+      [-1, 1].forEach((s) => g.add(blob(mats.body, 0.3, 0.34, 0.38, s * 0.66, -1.34, -0.1)));
+
+      // 蓬松大尾巴（狐狸的识别特征），侧后方扬起，白尾尖
+      const tail = pivot(0.44, -1.08, -0.46, -0.68, -0.22);
+      [0.34, 0.32, 0.28, 0.22].forEach((r, i) => {
+        const seg = new THREE.Mesh(new THREE.SphereGeometry(r, 20, 20), i === 3 ? mats.alt : mats.body);
+        seg.position.set(0, 0.16 + i * 0.32, 0);
+        tail.add(seg);
+      });
+      g.add(tail);
+      return { group: g, head, ears, arms, eyes, tail, wings: [] };
+    }
+
+    const PET_BUILDERS = {
+      bunny: buildBunny, bear: buildBear, cat: buildCat,
+      dog: buildDog, penguin: buildPenguin, fox: buildFox,
+    };
+
+    // WebGL 可用性检测——老人手机可能不支持，白屏等于稳定性丢分（PRD F1.6）
+    function detectWebGL() {
+      try {
+        // 先判断 Three.js 是否成功加载（CDN 失败时可能 undefined）
+        if (typeof THREE === 'undefined') return false;
+        const c = document.createElement('canvas');
+        return !!(window.WebGLRenderingContext && (c.getContext('webgl') || c.getContext('experimental-webgl')));
+      } catch (e) { return false; }
+    }
+
+    const lerp = (a, b, t) => a + (b - a) * t;
+
+    // ----------------------------------------------------------------------
+    // 3D Three.js Interactive Clay Pet Mesh Renderer Component
+    // ----------------------------------------------------------------------
+    function ClayPet3D({ petId = 'bunny', petState, bubbleText, onPetClick }) {
+      const containerRef = useRef(null);
+      const sceneRef = useRef(null);
+      const rendererRef = useRef(null);
+      const stageRef = useRef(null);      // 外层：承载弹簧挤压
+      const modelRef = useRef(null);      // 内层：当前物种的网格与动画句柄
+      const dragAngleY = useRef(0);
+      const dragAngleX = useRef(0);
+      const dragStart = useRef({ x: 0, y: 0, angleY: 0, angleX: 0, dragging: false, moved: false });
+      const stateRef = useRef(petState);  // 状态经 ref 传入动画循环，避免重建场景
+      const [webglOk] = useState(detectWebGL);
+
+      useEffect(() => { stateRef.current = petState; }, [petState]);
+
+      // Spring animation values (Jelly physical feel)
+      const scaleY = useRef(1.0);
+      const targetScaleY = useRef(1.0);
+      const velocityY = useRef(0.0);
+
+      // Trigger squash effect
+      const triggerSquash = () => {
+        if (dragStart.current.moved) {
+          dragStart.current.moved = false;
+          return;
+        }
+        targetScaleY.current = 0.65;
+        setTimeout(() => {
+          targetScaleY.current = 1.0;
+        }, 120);
+        if (onPetClick) onPetClick();
+      };
+
+      // Watch for pet feed state from outside to trigger mega squish
+      useEffect(() => {
+        if (petState === 'eating') {
+          targetScaleY.current = 0.55;
+          setTimeout(() => {
+            targetScaleY.current = 1.15;
+            setTimeout(() => {
+              targetScaleY.current = 1.0;
+            }, 180);
+          }, 150);
+        }
+      }, [petState]);
+
+      // 场景只建一次。原先依赖 [petState]，状态一变就销毁重建整个 WebGL 上下文，
+      // 既浪费又会闪一下；现在状态经 stateRef 流入动画循环。
+      useEffect(() => {
+        if (!containerRef.current || !webglOk) return;
+
+        const width = containerRef.current.clientWidth;
+        const height = containerRef.current.clientHeight;
+
+        // 1. Create Scene & Camera
+        const scene = new THREE.Scene();
+        sceneRef.current = scene;
+
+        const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
+        camera.position.set(0, 0, cameraZ(width / height));
+
+        // 2. Beautiful Soft Ambient Lighting (Studio Clay Render looks)
+        const ambientLight = new THREE.AmbientLight(0xfff5f0, 0.7);
+        scene.add(ambientLight);
+
+        // Warm direction light (rim support)
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(5, 8, 5);
+        scene.add(dirLight);
+
+        // Accent colored bounce light from bottom left
+        const bounceLight = new THREE.DirectionalLight(0xffdcd3, 0.4);
+        bounceLight.position.set(-5, -5, -2);
+        scene.add(bounceLight);
+
+        // 3. 舞台组：只建一次，物种网格由下面的 [petId] effect 挂载进来
+        const stage = new THREE.Group();
+        stage.position.y = -0.2;
+        stageRef.current = stage;
+        scene.add(stage);
+
+        // 4. Renderer setup
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(width, height);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        containerRef.current.appendChild(renderer.domElement);
+        rendererRef.current = renderer;
+
+        // 5. Clay soft float & spring physical animation loop
+        let clock = new THREE.Clock();
+        let animationFrameId;
+
+        const animate = () => {
+          animationFrameId = requestAnimationFrame(animate);
+          const elapsedTime = clock.getElapsedTime();
+
+          // Physical Spring solver for "Jelly Squish & Stretch"
+          const springConstant = 0.22;
+          const damping = 0.76;
+          const force = targetScaleY.current - scaleY.current;
+          velocityY.current += force * springConstant;
+          velocityY.current *= damping;
+          scaleY.current += velocityY.current;
+
+          // 挤压回弹永远作用在舞台组上，与具体物种无关
+          stage.scale.y = scaleY.current;
+          stage.scale.x = 2.0 - scaleY.current;
+          stage.scale.z = 2.0 - scaleY.current;
+
+          const model = modelRef.current;
+          if (model) {
+            const st = stateRef.current;
+
+            // 各状态的姿态参数
+            // 注意 §6.3：最差状态是 sleeping（睡着了），不是死亡；不做灰度、不蜷缩成一团
+            let amplitude = 0.08, speed = 2.0, headTilt = 0, eyeOpen = 1, limbAmp = 0.12, limbSpeed = 2.4;
+            if (st === 'sad') {
+              amplitude = 0.03; speed = 0.8; headTilt = -0.16; eyeOpen = 0.62; limbAmp = 0.04; limbSpeed = 1.0;
+            } else if (st === 'sleeping') {
+              amplitude = 0.02; speed = 0.5; headTilt = -0.10; eyeOpen = 0.06; limbAmp = 0.02; limbSpeed = 0.6;
+            } else if (st === 'happy') {
+              amplitude = 0.16; speed = 4.2; headTilt = 0.06; eyeOpen = 0.30; limbAmp = 0.30; limbSpeed = 5.0;
+            } else if (st === 'eating') {
+              amplitude = 0.10; speed = 3.2; eyeOpen = 0.45; limbAmp = 0.22; limbSpeed = 4.0;
+            }
+
+            stage.position.y = -0.2 + Math.sin(elapsedTime * speed) * amplitude;
+            stage.rotation.y = dragAngleY.current + Math.sin(elapsedTime * 0.7) * 0.04;
+            stage.rotation.x = dragAngleX.current;
+            stage.rotation.z = Math.cos(elapsedTime * 0.5) * 0.03;
+
+            // 低头 / 抬头。基线单独存，避免咀嚼抖动被 lerp 累积进去
+            model.headTilt = lerp(model.headTilt, headTilt, 0.08);
+            model.head.rotation.x = model.headTilt
+              + (st === 'eating' ? Math.sin(elapsedTime * 16) * 0.05 : 0);
+
+            // 表情：开心眯成月牙，睡着几乎闭合
+            model.eyes.forEach((e) => { e.scale.y = lerp(e.scale.y, eyeOpen, 0.12); });
+
+            // 耳朵：难过 / 睡着时垂下，其余时候轻颤
+            model.ears.forEach((p, i) => {
+              const droop = (st === 'sad' || st === 'sleeping') ? 0.55 : 0;
+              p.userData.cur = lerp(p.userData.cur, p.userData.base.rx + droop, 0.08);
+              p.rotation.x = p.userData.cur + Math.sin(elapsedTime * limbSpeed + i * 1.7) * limbAmp * 0.5;
+            });
+
+            // 手臂 / 前爪
+            model.arms.forEach((p, i) => {
+              p.rotation.x = Math.sin(elapsedTime * limbSpeed + i * Math.PI) * limbAmp * 0.6;
+            });
+
+            // 翅膀拍打（企鹅）
+            model.wings.forEach((p, i) => {
+              p.rotation.z = p.userData.base.rz
+                + Math.sin(elapsedTime * limbSpeed + i * Math.PI) * limbAmp * 0.9;
+            });
+
+            // 摇尾巴（狗 / 猫 / 狐狸）
+            if (model.tail) {
+              model.tail.rotation.z = model.tail.userData.base.rz
+                + Math.sin(elapsedTime * (limbSpeed + 1.6)) * limbAmp * 1.3;
+            }
+          }
+
+          renderer.render(scene, camera);
+        };
+
+        animate();
+
+        // 6. Fluid Responsive handling
+        const handleResize = () => {
+          if (!containerRef.current || !rendererRef.current) return;
+          const w = containerRef.current.clientWidth;
+          const h = containerRef.current.clientHeight;
+          camera.aspect = w / h;
+          camera.position.z = cameraZ(w / h);
+          camera.updateProjectionMatrix();
+          rendererRef.current.setSize(w, h);
+        };
+        window.addEventListener('resize', handleResize);
+
+        // Force final resize immediately
+        setTimeout(handleResize, 100);
+
+        return () => {
+          cancelAnimationFrame(animationFrameId);
+          window.removeEventListener('resize', handleResize);
+          if (rendererRef.current && rendererRef.current.domElement) {
+            rendererRef.current.dispose();
+            if (containerRef.current && containerRef.current.contains(rendererRef.current.domElement)) {
+              containerRef.current.removeChild(rendererRef.current.domElement);
+            }
+          }
+          rendererRef.current = null;
+        };
+      }, [webglOk]);
+
+      // 换宠物时只替换舞台里的网格，不动场景 / 相机 / 灯光 / 渲染器
+      useEffect(() => {
+        const stage = stageRef.current;
+        if (!stage) return;
+
+        const spec = PET_SPECS[petId] || PET_SPECS.bunny;
+        const build = PET_BUILDERS[petId] || PET_BUILDERS.bunny;
+
+        // 每只宠物独立持有一套材质，便于单独释放；参数沿用原版
+        const mats = {
+          body: makeClayMat(spec.body),
+          alt: makeClayMat(spec.alt),
+          accent: new THREE.MeshStandardMaterial({ color: spec.accent, roughness: 0.9, metalness: 0.0 }),
+          eye: new THREE.MeshStandardMaterial({ color: 0x111116, roughness: 0.1, metalness: 0.9 }),
+          cheek: new THREE.MeshStandardMaterial({
+            color: 0xfca18b, roughness: 0.95, transparent: true, opacity: 0.8,
+          }),
+        };
+
+        const model = build(mats);
+        model.mats = mats;
+        model.headTilt = 0;
+        model.group.scale.setScalar(spec.fit || 0.92);
+        stage.add(model.group);
+        modelRef.current = model;
+
+        return () => {
+          stage.remove(model.group);
+          model.group.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
+          Object.values(mats).forEach((m) => m.dispose());
+          modelRef.current = null;
+        };
+      }, [petId, webglOk]);
+
+      const startRotate = (clientX, clientY) => {
+        dragStart.current = {
+          x: clientX,
+          y: clientY,
+          angleY: dragAngleY.current,
+          angleX: dragAngleX.current,
+          dragging: true,
+          moved: false
+        };
+      };
+
+      const moveRotate = (clientX, clientY) => {
+        if (!dragStart.current.dragging) return;
+        const dx = clientX - dragStart.current.x;
+        const dy = clientY - dragStart.current.y;
+        if (Math.abs(dx) + Math.abs(dy) > 6) dragStart.current.moved = true;
+        dragAngleY.current = dragStart.current.angleY + dx * 0.012;
+        dragAngleX.current = Math.max(-0.55, Math.min(0.55, dragStart.current.angleX + dy * 0.008));
+      };
+
+      const endRotate = () => {
+        dragStart.current.dragging = false;
+      };
+
+      return (
+        <div
+          onClick={triggerSquash}
+          onPointerDown={(e) => { e.currentTarget.setPointerCapture?.(e.pointerId); startRotate(e.clientX, e.clientY); }}
+          onPointerMove={(e) => moveRotate(e.clientX, e.clientY)}
+          onPointerUp={endRotate}
+          onPointerCancel={endRotate}
+          className="relative w-full h-full cursor-grab active:cursor-grabbing touch-none active:scale-[0.98] transition-transform duration-100"
+        >
+          {/* Custom Ambient Particle Rings behind the Clay Buddy */}
+          <div className="absolute inset-x-0 bottom-12 top-12 rounded-full bg-gradient-to-tr from-rose-100/40 via-sky-100/30 to-violet-100/20 blur-3xl pointer-events-none -z-10" />
+
+          {/* Real WebGL interactive Canvas */}
+          <div ref={containerRef} className="w-full h-full" />
+
+          {/* WebGL 不可用时的 2D 降级（PRD F1.6）：老人手机可能跑不动 3D，
+              但绝不能白屏——核心流程必须照常可用 */}
+          {!webglOk && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="clay-surface-soft w-40 h-40 rounded-full flex items-center justify-center clay-float">
+                <span className="text-[5rem] leading-none select-none">
+                  {(PET_SPECS[petId] || PET_SPECS.bunny).emoji}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* 睡着了——不是死亡（§6.3） */}
+          {petState === 'sleeping' && (
+            <div className="absolute top-1/3 right-[22%] text-2xl text-slate-400/70 select-none pointer-events-none animate-pulse">
+              💤
+            </div>
+          )}
+
+          {/* Speech Bubble: Puffy Jelly Speech dialog */}
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 w-[85%] max-w-[280px]">
+            <div className="relative clay-surface-soft px-5 py-3.5 text-center text-sm md:text-base font-semibold text-slate-700 select-none animate-bounce delay-150 shadow-md">
+              <div className="flex items-center justify-center gap-2">
+                <span className="text-base">🎈</span>
+                <span>{bubbleText}</span>
+              </div>
+              {/* Bubble dynamic tail */}
+              <div className="absolute bottom-[-10px] left-1/2 -translate-x-1/2 w-6 h-6 bg-white rotate-45 border-r border-b border-rose-100/20 shadow-[4px_4px_8px_-2px_rgba(180,190,210,0.15)] rounded-ee-md" />
+            </div>
+          </div>
+          
+          {/* Clay Pet Touch Indicator overlay */}
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-white/70 backdrop-blur-md px-3.5 py-1.5 rounded-full text-sm text-slate-500 font-medium border border-white/50 shadow-sm pointer-events-none">
+            <Sparkles className="w-3.5 h-3.5 text-rose-400" />
+            <span>拖动可360°查看，轻点可捏一捏</span>
+          </div>
+        </div>
+      );
+    }
+
+    // ----------------------------------------------------------------------
+    // Main Application Engine
+    // ----------------------------------------------------------------------
+      const PET_STORAGE_KEY = "pillpal-clay-buddy-selected-pet-v1";
+      const APP_DATA_STORAGE_KEY = "pillpal-clay-buddy-app-data-v1";
+
+      // -------- Cloud (Supabase) ----------
+      // 数据库里所有表都开了 RLS 且没有给 anon 任何策略，前端拿不到裸表，
+      // 只能走 SECURITY DEFINER 的 RPC，且必须带上家庭码；写操作还要带 PIN 哈希。
+      // 所以这个 publishable key 公开在前端是安全的。
+      const SUPABASE_URL = "https://idxzxnxfcpazdtaossna.supabase.co";
+      const SUPABASE_KEY = "sb_publishable_saKdquYW3UGOcXnYpgvhWA_-M6rOnw4";
+      const sb = createClient(SUPABASE_URL, SUPABASE_KEY, {
+        auth: { persistSession: false, autoRefreshToken: false },
+        realtime: { params: { eventsPerSecond: 4 } },
+      });
+
+      const ADMIN_PIN_LOCAL_PREFIX = "pillpal-admin-pin-"; // + familyId
+      const DEMO_FAMILY_ID = "demo";
+      const DEMO_PIN = "000000";        // 演示家庭对所有人开放，评委扫码即可进管理端
+      const FAMILY_ID_RE = /^[a-z0-9-]{3,32}$/i;
+      const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+      function parseLaunchParams() {
+        try {
+          const sp = new URLSearchParams(window.location.search);
+          const familyRaw = (sp.get("family") || "").trim().toLowerCase();
+          const family = FAMILY_ID_RE.test(familyRaw) ? familyRaw : DEMO_FAMILY_ID;
+          // 同时接受 ?viewMode=mom 和旧写法 ?as=mom，任一即进妈妈端
+          const modeRaw = (sp.get("viewMode") || sp.get("as") || "").toLowerCase();
+          const viewMode = modeRaw === "mom" ? "mom" : "admin";
+          return { family, viewMode };
+        } catch {
+          return { family: DEMO_FAMILY_ID, viewMode: "admin" };
+        }
+      }
+
+      function generateFamilyId() {
+        // 10 chars from base32-ish alphabet (no confusing chars)
+        const alphabet = "abcdefghjkmnpqrstuvwxyz23456789";
+        const len = 10;
+        const buf = new Uint8Array(len);
+        (window.crypto || window.msCrypto).getRandomValues(buf);
+        let out = "";
+        for (let i = 0; i < len; i++) out += alphabet[buf[i] % alphabet.length];
+        return out;
+      }
+
+      function generateAdminPin() {
+        const buf = new Uint8Array(6);
+        (window.crypto || window.msCrypto).getRandomValues(buf);
+        let n = "";
+        for (let i = 0; i < buf.length; i++) n += (buf[i] % 10).toString();
+        return n; // 6 digits
+      }
+
+      function readLocalAdminPin(familyId) {
+        try { return localStorage.getItem(ADMIN_PIN_LOCAL_PREFIX + familyId) || ""; }
+        catch { return ""; }
+      }
+      function writeLocalAdminPin(familyId, pin) {
+        try { localStorage.setItem(ADMIN_PIN_LOCAL_PREFIX + familyId, pin); } catch {}
+      }
+
+      // PIN 从不明文出网：本机存明文（方便回填输入框），发出去的永远是 SHA-256。
+      // 加家庭码当盐，避免同一个 6 位 PIN 在不同家庭算出同一个哈希。
+      async function hashPin(familyId, pin) {
+        if (!pin) return null;
+        const bytes = new TextEncoder().encode(`yaobao:${familyId}:${pin}`);
+        const digest = await crypto.subtle.digest("SHA-256", bytes);
+        return Array.from(new Uint8Array(digest))
+          .map((b) => b.toString(16).padStart(2, "0")).join("");
+      }
+
+      // RPC 统一出口：Supabase 把业务异常放在 error.message 里（如 bad_pin），
+      // 这里原样抛出，调用点用 e.message 判断。
+      async function rpc(fn, params) {
+        const { data, error } = await sb.rpc(fn, params);
+        if (error) throw new Error(error.message || String(error));
+        return data;
+      }
+
+      // 服务端一次性算好整份快照（含今日服药状态、近 7 天真实完成率），
+      // 结构直接对应前端 state，拿到就能 setState。
+      const cloudGet = (familyId) =>
+        rpc("yb_get_family", { p_code: familyId, p_local_date: todayKey() });
+
+      // F11.4 家人端读取最近健康关心信号（服务端在语音陪伴时静默记录）
+      const cloudHealthRecent = (familyId, days = 14) =>
+        rpc("yb_health_recent", { p_code: familyId, p_days: days });
+
+      // F11.4 健康信号 → 家人端的中性措辞。绝不出现诊断/风险类词（§F11.6 安全红线）。
+      // 只描述"老人主动提到了什么"，把判断权交给家人和医生。
+      const HEALTH_SIGNAL_META = {
+        sleep:     { emoji: "🌙", label: "提到睡得不太好" },
+        appetite:  { emoji: "🍚", label: "提到胃口不太好" },
+        complaint: { emoji: "🤍", label: "提到身体不太舒服" },
+        mood:      { emoji: "💭", label: "提到心情有点低落" },
+      };
+      const signalLabel = (kind) => (HEALTH_SIGNAL_META[kind] || { emoji: "💬", label: "说了句悄悄话" }).label;
+      const signalEmoji = (kind) => (HEALTH_SIGNAL_META[kind] || { emoji: "💬" }).emoji;
+
+      // -------- AI（F11）：统一走 yb-ai Edge Function，百炼 Key 只在服务端 --------
+      // 前端永远不持有模型 Key。任何失败（超时/断网/Key 未配置）都返回 {ok:false}，
+      // 由调用点回退到预置文案库 —— 绝不白屏、不报错（F11.6 优雅降级）。
+      const AI_ENDPOINT = `${SUPABASE_URL}/functions/v1/yb-ai`;
+      async function callAI(payload, timeoutMs = 15000) {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+        try {
+          const resp = await fetch(AI_ENDPOINT, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "apikey": SUPABASE_KEY,
+              "Authorization": `Bearer ${SUPABASE_KEY}`,
+            },
+            body: JSON.stringify(payload),
+            signal: ctrl.signal,
+          });
+          return await resp.json();
+        } catch (e) {
+          return { ok: false, error: "network" };
+        } finally {
+          clearTimeout(timer);
+        }
+      }
+
+      // AI 不可用时的宠物陪伴兜底文案（温暖、不涉医、不指责，符合 §6.3）
+      const PET_FALLBACK_REPLIES = [
+        "我在听呢，你慢慢说，我一直陪着你。",
+        "能听到你的声音真好呀，今天也要开开心心的哦！",
+        "谢谢你跟我说话，我最喜欢你啦！❤️",
+        "嗯嗯，我都记住啦，你要照顾好自己哦。",
+        "有你在身边，我觉得好幸福呀~",
+      ];
+      const pickFallbackReply = () =>
+        PET_FALLBACK_REPLIES[Math.floor(Math.random() * PET_FALLBACK_REPLIES.length)];
+
+      // F11.6:511 老人说身体不舒服时，必须统一引导就医——这条不能只靠服务端。
+      // AI 未配置/超时/断网时若还随机回「我最喜欢你啦」，等于把不适信号丢了。
+      // 关键词表与服务端 SIGNAL_RULES 保持一致（纯本地匹配，零延迟、不需要 Key）。
+      const LOCAL_SIGNAL_RULES = [
+        { kind: "complaint", words: ["头晕", "头疼", "头痛", "难受", "不舒服", "胸闷", "心慌", "乏力", "没力气", "腿疼", "肚子疼"] },
+        { kind: "sleep",     words: ["睡不着", "失眠", "没睡好", "睡得浅", "睡得不好", "整夜"] },
+        { kind: "appetite",  words: ["没胃口", "不想吃", "吃不下", "没食欲"] },
+        { kind: "mood",      words: ["难过", "心情不好", "闷", "孤单", "想你们", "没意思"] },
+      ];
+      const detectLocalSignal = (text) => {
+        const t = String(text || "");
+        for (const rule of LOCAL_SIGNAL_RULES) {
+          if (rule.words.some(w => t.includes(w))) return rule.kind;
+        }
+        return null;
+      };
+      // 降级时按信号类型给话术：身体不适 → 引导就医 + 告知会转达家人；其余 → 温暖陪伴
+      const CARE_REPLIES = {
+        complaint: "听你这么说我有点担心呢。这个要问医生哦，我帮你记下来告诉你的家人好不好？",
+        sleep: "没睡好一定很难受吧。我记下来告诉家人，要是一直这样，记得跟医生说说哦。",
+        appetite: "吃不下的时候别硬撑。我跟家人说一声，不舒服要及时看医生哦。",
+        mood: "我陪着你呢，不开心的时候可以跟我说说。要不要给家人打个电话？💛",
+      };
+
+      // F11.6 前端医疗红线词兜底过滤——服务端 sanitizeReply 只盖 chat，vision/asr 漏网，
+      // 且边缘函数需用户手动重部署。前端必须做防御性过滤，保证任何 AI 文本落地前都安全。
+      // 红线词：疑似/确诊/风险/异常/建议服用/加大剂量/停药/处方（§F11.6 医疗安全红线）
+      const MEDICAL_REDLINE = ["疑似", "确诊", "风险", "异常", "建议服用", "加大剂量", "停药", "处方"];
+      function sanitizeAIText(text) {
+        if (typeof text !== "string") return text;
+        let safe = text;
+        for (const word of MEDICAL_REDLINE) {
+          const re = new RegExp(word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g");
+          safe = safe.replace(re, "【已过滤】");
+        }
+        return safe;
+      }
+
+      function blobToBase64(blob) {
+        return new Promise((resolve) => {
+          const r = new FileReader();
+          r.onloadend = () => resolve(String(r.result || "").split(",")[1] || "");
+          r.onerror = () => resolve("");
+          r.readAsDataURL(blob);
+        });
+      }
+
+      async function cloudCreateFamily(familyId, pin, seed) {
+        return rpc("yb_create_family", {
+          p_code: familyId,
+          p_pin_hash: await hashPin(familyId, pin),
+          p_display_name: seed.displayName || "我们家",
+          p_elder_name: seed.elderName || "妈妈",
+          p_local_date: todayKey(),
+          p_seed: seed.payload || {},
+        });
+      }
+
+      // 配置类改动（药品清单、家人、就诊记录、宠物换装）走整份覆盖，管理端限定。
+      async function cloudSaveConfig(familyId, payload, pin) {
+        return rpc("yb_save_config", {
+          p_code: familyId,
+          p_pin_hash: await hashPin(familyId, pin),
+          p_payload: payload,
+          p_local_date: todayKey(),
+        });
+      }
+
+      // 服药是流水账：只追加，不改写。服务端算积分/等级/健康值/连续天数，
+      // 返回 { levelUp, snapshot }——升级提示以服务端为准，避免两端各算一次对不上。
+      const cloudLogDose = (familyId, medicationId, taken, actor, via) =>
+        rpc("yb_log_dose", {
+          p_code: familyId, p_medication_id: medicationId, p_taken: taken,
+          p_actor: actor || "妈妈", p_via: via || "tap", p_local_date: todayKey(),
+        });
+
+      async function cloudAddNote(familyId, text, author, pin) {
+        return rpc("yb_add_note", {
+          p_code: familyId,
+          p_pin_hash: await hashPin(familyId, pin),
+          p_author: author || "家人", p_text: text, p_local_date: todayKey(),
+        });
+      }
+
+      const cloudVerifyPin = async (familyId, pin) =>
+        rpc("yb_verify_pin", { p_code: familyId, p_pin_hash: await hashPin(familyId, pin) });
+
+      // 跨设备同步用 Realtime Broadcast，不用 postgres_changes：
+      // 后者要按 anon 身份过 RLS，而 anon 在表上没有任何策略，永远收不到。
+      // Broadcast 只是一条按家庭码分频道的通知，收到就重新拉快照。
+      function openFamilyChannel(familyId, onChanged) {
+        const ch = sb.channel(`family:${familyId}`, { config: { broadcast: { self: false } } });
+        ch.on("broadcast", { event: "changed" }, onChanged).subscribe();
+        return {
+          notify: () => { try { ch.send({ type: "broadcast", event: "changed", payload: {} }); } catch {} },
+          close: () => { try { sb.removeChannel(ch); } catch {} },
+        };
+      }
+
+      // Date helper: YYYY-MM-DD in local time
+      function todayKey() {
+        const d = new Date();
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        return `${d.getFullYear()}-${mm}-${dd}`;
+      }
+
+      // 从服务端权威 events 流重建「今天某药的已服时段 takenSlots」。
+      // 服务端 yb_dose_logs 没有时段列，我们把时段编码进 via（如 "self:13:00"/"proxy:20:00"），
+      // 它随 events 往返。多剂次的每一剂都是独立的一条服药动作，最近一次动作决定该时段状态。
+      // 无「带时段」事件时返回 null，让上层回退到整药布尔 m.taken（向后兼容旧数据/单剂次）。
+      function reconstructTakenSlots(medId, times, events) {
+        if (!Array.isArray(events) || !Array.isArray(times) || times.length === 0) return null;
+        const today = todayKey();
+        const localDateOf = (iso) => {
+          const d = new Date(iso);
+          if (isNaN(d.getTime())) return "";
+          const mm = String(d.getMonth() + 1).padStart(2, "0");
+          const dd = String(d.getDate()).padStart(2, "0");
+          return `${d.getFullYear()}-${mm}-${dd}`;
+        };
+        const parseSlot = (via) => {
+          const s = String(via || "");
+          const i = s.indexOf(":");
+          return i >= 0 ? s.slice(i + 1) : "";   // 冒号后是时段；旧数据无冒号 → ""
+        };
+        const rows = events
+          .filter(e => e && e.type === "mom_take" && String(e.medId) === String(medId))
+          .filter(e => localDateOf(e.at) === today)        // 用本地日期比对，避免 UTC 时区错位
+          .map(e => ({ slot: parseSlot(e.via), taken: !!e.taken, at: e.at }))
+          .filter(e => e.slot && times.includes(e.slot))   // 只认仍属于该药的时段
+          .sort((a, b) => new Date(b.at) - new Date(a.at)); // 新 → 旧
+        if (!rows.length) return null;                     // 无带时段事件 → 交给上层回退
+        const state = {};                                  // slot → 最近一次动作是否「已服」
+        for (const r of rows) { if (!(r.slot in state)) state[r.slot] = r.taken; }
+        return times.filter(t => state[t]);
+      }
+
+      // ---- 服药提醒引擎（PRD F2.2）--------------------------------------
+      // times 是 "HH:MM" 列表。到点仍未服即进入 pending；超过 GRACE 分钟后
+      // 措辞升级为"别忘了"。严格遵守 §6.3：只升级【提醒力度】，绝不自动扣健康、
+      // 不指责、不制造焦虑——健康值只在明确点击"我吃了 / 取消"时变化。
+      const REMIND_GRACE_MIN = 120;
+      const parseHM = (s) => {
+        const m = /^(\d{1,2}):(\d{2})$/.exec(String(s || "").trim());
+        if (!m) return NaN;
+        const h = +m[1], mi = +m[2];
+        return h < 24 && mi < 60 ? h * 60 + mi : NaN;
+      };
+      const fmtHM = (mins) =>
+        `${String(Math.floor(mins / 60) % 24).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
+
+      // 返回 { pending:[{med,slot,refMin,lateMin,overdue}], upcoming:[{med,slot,nextMin}] }
+      // 按时段拆分：一种药多个服药时间分别独立判定，不会因为吃了上午那剂就漏掉晚上那剂。
+      function computeReminders(meds, now) {
+        const cur = now.getHours() * 60 + now.getMinutes();
+        const pending = [], upcoming = [];
+        for (const med of meds || []) {
+          // 已完成的时段：优先取 takenSlots，没有时退回旧 taken 布尔（全完成则=所有时段）
+          const takenSlots = med.takenSlots || (med.taken ? (med.times || []) : []);
+          const takenMins = new Set(takenSlots.map(parseHM).filter(n => !Number.isNaN(n)));
+          // 只保留尚未完成的时段
+          const slots = (med.times || []).map(t => ({ t, min: parseHM(t) }))
+            .filter(({ min }) => !Number.isNaN(min) && !takenMins.has(min))
+            .sort((a, b) => a.min - b.min);
+          if (!slots.length) continue;   // 所有时段都完成了
+          const due = slots.filter(({ min }) => min <= cur);
+          if (due.length) {
+            // 每个到点未服的时段各自成为一条 pending。
+            // 不能只取欠最久的那个：13:00 一直没点、20:00 到来时，若 pending 里只有 13:00，
+            // 通知去重 key（日期|药id|时段）早已标记过 → 20:00 这剂永远收不到提醒（漏服安全问题）。
+            for (const { t: slot, min: ref } of due) {
+              pending.push({ med, slot, refMin: ref, lateMin: cur - ref, overdue: cur - ref >= REMIND_GRACE_MIN });
+            }
+          } else {
+            const { t: slot, min: nextMin } = slots[0];
+            upcoming.push({ med, slot, nextMin });
+          }
+        }
+        pending.sort((a, b) => a.refMin - b.refMin);
+        upcoming.sort((a, b) => a.nextMin - b.nextMin);
+        return { pending, upcoming };
+      }
+
+      const defaultPets = [
+        { id: 'bunny', name: '糖包', title: '软萌兔', emoji: '🐰', selected: true, type: '兔兔', state: 'float', color: 'from-rose-100 to-orange-100' },
+        { id: 'bear', name: '奶酪熊', title: '抱抱熊', emoji: '🐻', selected: false, type: '小熊', state: 'float', color: 'from-amber-100 to-yellow-100' },
+        { id: 'cat', name: '小甜橘', title: '元气猫', emoji: '🐱', selected: false, type: '小猫', state: 'float', color: 'from-orange-100 to-pink-100' },
+        { id: 'dog', name: '糯米', title: '守护犬', emoji: '🐶', selected: false, type: '小狗', state: 'sick', color: 'from-sky-100 to-cyan-100' },
+        { id: 'penguin', name: '冰豆', title: '企鹅仔', emoji: '🐧', selected: false, type: '企鹅', state: 'float', color: 'from-indigo-100 to-sky-100' },
+        { id: 'fox', name: '莓莓', title: '小狐狸', emoji: '🦊', selected: false, type: '狐狸', state: 'sleeping', color: 'from-red-100 to-slate-100' }
+      ];
+
+      const makeSelectedPet = (pet, base = {}) => {
+        // §6.3：措辞不指责、不制造焦虑；健康值下限 15，永不归零
+        const stateMap = { float: '活力满满', sick: '有点没精神', sleeping: '睡着啦' };
+        const defaultHealth = { float: 85, sick: 38, sleeping: 17 };
+        return {
+          id: pet.id,
+          name: pet.name,
+          level: base.level ?? 4,
+          points: base.points ?? 75,
+          targetPoints: base.targetPoints ?? 100,
+          status: stateMap[pet.state],
+          healthIndex: base.healthIndex ?? defaultHealth[pet.state],
+          lastFeedTime: base.lastFeedTime ?? '早上 08:15',
+          type: pet.type
+        };
+      };
+
+      const loadSavedPet = () => {
+        try {
+          const saved = JSON.parse(localStorage.getItem(PET_STORAGE_KEY) || "null");
+          const pet = defaultPets.find(item => item.id === saved?.id) || defaultPets[0];
+          return { pet, selectedPet: makeSelectedPet(pet, saved?.selectedPet || {}) };
+        } catch (error) {
+          return { pet: defaultPets[0], selectedPet: makeSelectedPet(defaultPets[0]) };
+        }
+      };
+
+      function App() {
+      // ---- Launch params: family + viewMode (admin|mom) ----
+      const launch = parseLaunchParams();
+      const [familyId, setFamilyId] = useState(launch.family);
+      const [viewMode, setViewMode] = useState(launch.viewMode);
+      const [adminPin, setAdminPin] = useState(() => readLocalAdminPin(launch.family));
+      const [cloudStatus, setCloudStatus] = useState("idle"); // idle | loading | synced | error
+      const [cloudError, setCloudError] = useState("");
+      const [createFamilyOpen, setCreateFamilyOpen] = useState(false);
+
+      // Current View state: 'home' | 'medication' | 'doctor' | 'family' | 'settings'
+      // settings 仅 admin 模式显示
+      const [currentTab, setCurrentTab] = useState(launch.viewMode === "mom" ? "home" : "home");
+
+      const savedPetData = loadSavedPet();
+
+      // Mock Data store: 6 clay animal companions with three health animation states
+      const [petCollection, setPetCollection] = useState(defaultPets.map(item => ({ ...item, selected: item.id === savedPetData.pet.id })));
+
+      const [selectedPet, setSelectedPet] = useState(savedPetData.selectedPet);
+      const appDataHydratedRef = useRef(false);
+      const writeTimerRef = useRef(null);
+      const channelRef = useRef(null);       // Realtime 家庭频道
+      const lastCfgSigRef = useRef(null);     // 服务端权威配置签名，抑制回写抖动
+      const dayKeyRef = useRef(todayKey());   // 当前「哪一天」，用于跨 00:00 重置服药状态
+      // 新增药物后服务端还没分配 UUID（防抖保存约 800ms）就点「我吃了」时，
+      // 把这次服药按「药名+时段」暂存，UUID 到位后自动补发，避免日志静默丢失。
+      const pendingDosesRef = useRef([]);
+
+      // Dialog Bubble script list depending on actions
+      const [bubbleText, setBubbleText] = useState("主人，今天也要乖乖吃药喂我哦！");
+      const [streakDays, setStreakDays] = useState(6);
+      const [lastTakeDate, setLastTakeDate] = useState(""); // YYYY-MM-DD — 上一次任意药勾完整一天的日期
+      const [achievementShare, setAchievementShare] = useState(null);
+      const [expandedLogId, setExpandedLogId] = useState(1);
+      const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+      const [isChangingPet, setIsChangingPet] = useState(false);
+
+      // Medication Task Lists
+      const [medications, setMedications] = useState([
+        { id: 1, name: "倍他乐克（降血压）", dose: "1片 / 每日一次", times: ["08:00"], taken: true, takenSlots: ["08:00"], icon: "💊", color: "from-amber-200 to-rose-200" },
+        { id: 2, name: "养心安神口服液", dose: "1支 / 温开水冲服", times: ["13:00", "20:00"], taken: false, takenSlots: [], icon: "🍼", color: "from-teal-200 to-cyan-200" },
+        { id: 3, name: "维生素C 软糖", dose: "2粒 / 嚼服", times: ["20:30"], taken: false, takenSlots: [], icon: "🍬", color: "from-pink-200 to-orange-200" }
+      ]);
+
+      const [weeklyHistory, setWeeklyHistory] = useState([
+        { day: '周一', done: 3, total: 3 },
+        { day: '周二', done: 2, total: 3 },
+        { day: '周三', done: 3, total: 3 },
+        { day: '周四', done: 3, total: 3 },
+        { day: '周五', done: 2, total: 3 },
+        { day: '周六', done: 3, total: 3 },
+        { day: '今天', done: 1, total: 3 }
+      ]);
+
+      // Family members — 来自 cloud blob，admin 可增删
+      const [familyMembers, setFamilyMembers] = useState([
+        { id: 1, name: "露露", relation: "女儿", avatar: "👩", status: "已绑定", permission: "可查看健康值、服药历史、留言" },
+        { id: 2, name: "伟强", relation: "儿子", avatar: "👦", status: "已绑定", permission: "可查看健康值、服药历史、留言" }
+      ]);
+
+      // Family Board events — 真实事件流（admin_note 和 mom_take）
+      const [events, setEvents] = useState([]);
+
+      // 兼容旧 familyFeed 字段，仅作为初次种子展示
+      const [familyFeed, setFamilyFeed] = useState([
+        { id: 1, author: "女儿 露露", text: "刚刚送来了一杯温水，并留话：『妈妈今天要保重身体，糖包真可爱！』", time: "20分钟前", type: "note" },
+        { id: 2, author: "儿子 伟强", text: "查看了宠物的饱腹度。发送了药丸提醒提醒。", time: "今天 08:30", type: "inspect" },
+      ]);
+
+      // Medical directives log
+      const [medicalLogs, setMedicalLogs] = useState([
+        { id: 1, hospital: "华山医院心内科", doctor: "杨医生", visitDate: "2026-02-21", followDate: "2026-03-15", content: "避免空腹服用黄色胶囊，多喝开水。若出现明显头晕，先坐下休息并记录血压。", tags: ["餐后", "血压", "复诊"] },
+        { id: 2, hospital: "社区中医诊所", doctor: "陈中医", visitDate: "2026-02-10", followDate: "2026-04-10", content: "每天中午吃饱后再喝汤药，注意清淡饮食，少油炸。睡前可温水泡脚 15 分钟。", tags: ["汤药", "饮食"] }
+      ]);
+
+      const [newLog, setNewLog] = useState({ hospital: "", doctor: "", followDate: "", content: "" });
+
+      // Admin → mom 留言输入
+      const [adminNoteText, setAdminNoteText] = useState("");
+      const [adminNoteAuthor, setAdminNoteAuthor] = useState("家人");
+
+      // Add-family-member form
+      const [newMemberName, setNewMemberName] = useState("");
+      const [newMemberRelation, setNewMemberRelation] = useState("");
+      const [newMemberAvatar, setNewMemberAvatar] = useState("👤");
+
+      // Forms addition state
+      const [newMedName, setNewMedName] = useState("");
+      const [newMedDose, setNewMedDose] = useState("");
+      const [newMedTimes, setNewMedTimes] = useState(["08:00"]);
+      const [showNewMedModal, setShowNewMedModal] = useState(false);
+      // F11.2 药盒拍照识别：vision 结果是「草稿」，必须人工确认才落库（安全边界）
+      const [visionBusy, setVisionBusy] = useState(false);
+      const [visionDraft, setVisionDraft] = useState(null); // null | [{name,dose,times,notes}]
+      // F11.3 医嘱语音速记：录一段 → ASR → 填入医嘱内容（人工确认后保存）
+      const [medRecState, setMedRecState] = useState("idle"); // idle | recording | thinking
+      const medRecRef = useRef(null);
+      const medTalkingRef = useRef(false);   // 家人是否仍按住医嘱录音键（松手权威信号）
+      const medHandoffRef = useRef(false);   // SR 出错后是否已交棒给 MediaRecorder（供 onend 判别，避免竞态）
+
+      // Simple animation helper for click pet interaction
+      const [petReactState, setPetReactState] = useState('idle'); // 'idle' | 'happy' | 'eating' | 'sad'
+      const [elderName, setElderName] = useState(""); // 老人称呼，用于 AI 陪伴个性化（来自云端快照）
+      const [healthSignals, setHealthSignals] = useState([]); // F11.4 家人端健康关心信号
+
+      // 静息状态由健康值决定；happy / eating 这类瞬时反应优先级更高会覆盖它。
+      // §6.3：最差只到 sleeping（睡着了），永远不会死。
+      const petVisualState = (petReactState === 'idle' || petReactState === 'sad')
+        ? (selectedPet.healthIndex < 20 ? 'sleeping' : selectedPet.healthIndex < 50 ? 'sad' : 'idle')
+        : petReactState;
+
+      // Toast feedback alert
+      const [toastMsg, setToastMsg] = useState("");
+
+      // Action: Confirm feeding/taking medicine
+      // slot 参数：多剂次药（如 ["13:00","20:00"]）传入具体时段字符串；单次药或整体操作传 null
+      const handleTakeMedication = (id, slot = null) => {
+        const target = medications.find(m => m.id === id);
+        if (!target) return;
+        const times = target.times || [];
+
+        // 收敛到单一 effSlot：传了就用，没传就智能选择
+        // 单剂次/无时段 → 第一个时段或 null
+        // 多剂次无 slot → 下一个未吃时段（智能代记），全吃了取最后一个（撤销）
+        let effSlot = slot;
+        if (!effSlot) {
+          const prevTakenSlots = target.takenSlots || (target.taken ? times : []);
+          if (times.length <= 1) {
+            effSlot = times[0] || null;
+          } else {
+            const notYet = times.filter(t => !prevTakenSlots.includes(t));
+            effSlot = notYet.length > 0 ? notYet[0] : times[times.length - 1];
+          }
+        }
+
+        // 计算本次操作后的 takenSlots（函数式更新内部用，避免闭包 stale）
+        const computeNext = (prev) => {
+          const prevTakenSlots = prev.takenSlots || (prev.taken ? times : []);
+          const alreadyDone = effSlot ? prevTakenSlots.includes(effSlot) : prev.taken;
+          const actingSlotTaken = !alreadyDone;
+          let nextTakenSlots;
+          if (effSlot) {
+            nextTakenSlots = alreadyDone
+              ? prevTakenSlots.filter(s => s !== effSlot)
+              : [...prevTakenSlots, effSlot];
+          } else {
+            nextTakenSlots = actingSlotTaken ? times : [];
+          }
+          const nextTaken = times.length > 0 && nextTakenSlots.length >= times.length;
+          return { actingSlotTaken, nextTaken, nextTakenSlots };
+        };
+
+        // 先算一次拿到本次动作结果，给副作用、乐观事件和 RPC 用
+        const { actingSlotTaken, nextTaken, nextTakenSlots } = computeNext(target);
+
+        // ---- 乐观更新本地 medication 状态 ----
+        setMedications(prev => prev.map(med => {
+          if (med.id !== id) return med;
+          if (actingSlotTaken) {
+            // Yay! Medicating maps to feeding pet!
+            setPetReactState('eating');
+            setBubbleText("哇呜！啊姆！药片变甜啦，真好吃！⭐");
+
+            // ----- streakDays 按天判定（修复旧 bug：原来按片+1）-----
+            const today = todayKey();
+            let nextStreak = streakDays;
+            if (lastTakeDate !== today) {
+              const yesterday = (() => {
+                const d = new Date();
+                d.setDate(d.getDate() - 1);
+                const mm = String(d.getMonth()+1).padStart(2,"0");
+                const dd = String(d.getDate()).padStart(2,"0");
+                return `${d.getFullYear()}-${mm}-${dd}`;
+              })();
+              nextStreak = (!lastTakeDate || lastTakeDate === yesterday) ? streakDays + 1 : 1;
+              setStreakDays(nextStreak);
+              setLastTakeDate(today);
+            }
+
+            setWeeklyHistory(prev => prev.map(item => item.day === '今天' ? { ...item, done: Math.min(item.done + 1, item.total) } : item));
+            if ([7, 14, 30].includes(nextStreak)) {
+              setAchievementShare({ days: nextStreak, pet: selectedPet.name });
+              showToast(`🏆 连续打卡 ${nextStreak} 天！生成社区分享卡`);
+            }
+
+            const newPoints = Math.min(selectedPet.points + 25, 100);
+            let nextLvl = selectedPet.level;
+            let nextPoints = newPoints;
+            if (newPoints >= 100) { nextLvl += 1; nextPoints = 0; }
+            setSelectedPet(current => ({
+              ...current,
+              points: nextPoints,
+              level: nextLvl,
+              healthIndex: Math.min(current.healthIndex + 10, 100),
+              status: '活力满满',
+              lastFeedTime: '刚刚 确认服药'
+            }));
+            setTimeout(() => {
+              setPetReactState('happy');
+              setBubbleText(`${selectedPet.name}感到元气满满！谢谢你照顾自己！❤️`);
+            }, 1200);
+            return { ...med, taken: nextTaken, takenSlots: nextTakenSlots };
+          } else {
+            setSelectedPet(current => ({
+              ...current,
+              // §6.3 伦理约束：健康值下限 15，永远不会归零、不会「死」（与服务端 yb_log_dose 一致）
+              healthIndex: Math.max(current.healthIndex - 10, 15),
+              points: Math.max(current.points - 25, 0)
+            }));
+            setBubbleText("嗯？吐出来了嘛？不要漏服药哦...");
+            return { ...med, taken: nextTaken, takenSlots: nextTakenSlots };
+          }
+        }));
+
+        // ---- 乐观加一条事件（服务端回来后会用权威 events 覆盖）----
+        const authorLabel = viewMode === "mom"
+          ? "妈妈 自己确认"
+          : `${adminNoteAuthor} 帮记录`;
+        setEvents(prev => [{
+          id: Date.now(), type: "mom_take", medId: id, medName: target.name,
+          taken: actingSlotTaken, author: authorLabel, at: new Date().toISOString(),
+        }, ...prev].slice(0, 200));
+
+        // ---- 服药是流水账，只追加：两种视角都写服务端（妈妈自己勾 / 家人代记）----
+        // 服务端独占计算积分/等级/健康/连续天数，返回权威快照后整体对齐，避免两端各算一次对不上。
+        // via 编码时段（如 "self:13:00" / "proxy:20:00"）供服务端 events 流存储，客户端重建 takenSlots
+        if (appDataHydratedRef.current && effSlot) {
+          const via = (viewMode === "mom" ? "self" : "proxy") + ":" + effSlot;
+          if (UUID_RE.test(String(id))) {
+            cloudLogDose(familyId, id, actingSlotTaken, authorLabel, via).then(res => {
+              if (res?.snapshot) applyServerSnapshot(res.snapshot, "rpc");
+              if (res?.levelUp) showToast(`🎉 恭喜${selectedPet.name}又升了一级！活力无限！`);
+              channelRef.current?.notify();     // 通知另一端刷新
+              setCloudStatus("synced");
+            }).catch(err => {
+              console.warn("log_dose failed", err);
+              showToast("📡 网络不稳，本地已记录");
+            });
+          } else {
+            // 新药还没拿到服务端 UUID：按「药名+时段」入队，UUID 到位后补发（见 flushPendingDoses）。
+            // 同一药同一时段只保留最后一次动作（连点 take/undo 以最终态为准）。
+            pendingDosesRef.current = [
+              ...pendingDosesRef.current.filter(
+                d => !(d.name === target.name && d.slot === effSlot)
+              ),
+              { name: target.name, slot: effSlot, taken: actingSlotTaken, actor: authorLabel, via, day: todayKey() },
+            ];
+          }
+        }
+      };
+
+      // UUID 到位后补发暂存的服药日志（#11）。medications 更新后触发，按药名匹配。
+      const flushPendingDoses = (meds) => {
+        if (!pendingDosesRef.current.length || !appDataHydratedRef.current) return;
+        const rest = [];
+        const toSend = [];
+        const today = todayKey();
+        for (const d of pendingDosesRef.current) {
+          if (d.day && d.day !== today) continue;   // 跨天未补发：丢弃，别把昨天的记到今天
+          const hit = (meds || []).find(m => m.name === d.name && UUID_RE.test(String(m.id)));
+          if (hit) toSend.push({ ...d, id: hit.id });
+          else rest.push(d);              // 还没换到 uuid，下次再试
+        }
+        pendingDosesRef.current = rest;
+        if (!toSend.length) return;
+        // 串行补发：yb_log_dose 会算积分，并发会互相覆盖快照
+        (async () => {
+          for (const d of toSend) {
+            try {
+              const res = await cloudLogDose(familyId, d.id, d.taken, d.actor, d.via);
+              if (res?.snapshot) applyServerSnapshot(res.snapshot, "rpc");
+            } catch (err) { console.warn("flush dose failed", err); }
+          }
+          channelRef.current?.notify();
+          setCloudStatus("synced");
+        })();
+      };
+
+      // Action: Quick pats / Interact with Clay Companion
+      const handlePetClick = () => {
+        const reactions = [
+          "哎呀，戳到我的软糯肚皮啦！(晃动)",
+          "你摸摸我，我也摸摸你的心！❤️",
+          "按时吃药，保持开开心心！",
+          "咕噜咕噜，兔兔感觉超级治愈~",
+          "你今天过得怎么样？别忘了喝杯水！☕"
+        ];
+        const randomText = reactions[Math.floor(Math.random() * reactions.length)];
+        setBubbleText(randomText);
+        setPetReactState('happy');
+        setTimeout(() => setPetReactState('idle'), 1500);
+      };
+
+      // Send a real note to the mom from an admin family member.
+      // 只在 admin 模式生效（mom 视角看不到这个入口）。
+      const sendAdminNote = (text, author) => {
+        const t = (text || "").trim();
+        if (!t) {
+          showToast("请先写两句要说的话");
+          return Promise.resolve(false);
+        }
+        const who = author || adminNoteAuthor || "家人";
+        // 乐观更新（服务端回来后用权威 events 覆盖）
+        setEvents(prev => [{
+          id: Date.now(), type: "admin_note", author: who, text: t, at: new Date().toISOString(),
+        }, ...prev].slice(0, 200));
+        setBubbleText(`${who} 给你留言了 💌`);
+        showToast("💌 留言已发到妈妈那一头");
+
+        return cloudAddNote(familyId, t, who, pinForWrite()).then(snap => {
+          if (snap) applyServerSnapshot(snap, "rpc");
+          channelRef.current?.notify();     // 通知妈妈端刷新
+          return true;
+        }).catch(err => {
+          console.warn("admin_note failed", err);
+          showToast("📡 留言上云失败：" + (err.message || ""));
+          return false;
+        });
+      };
+
+      // 老入口：左下"倒杯温水"按钮，admin 模式快速发一条预设留言；mom 模式禁用。
+      const feedFamilyReminder = () => {
+        if (viewMode === "mom") {
+          showToast("妈妈视角看不见这个按钮~");
+          return;
+        }
+        sendAdminNote(`${adminNoteAuthor} 给你倒了一杯温水 ☕`, adminNoteAuthor);
+      };
+
+      // Add medication dynamic handler
+      const addNewMedication = (e) => {
+        e.preventDefault();
+        if (!newMedName || !newMedDose || newMedTimes.length === 0) return;
+
+        const emojis = ["💊", "🍬", "🍼", "🍵", "🔮"];
+        const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+
+        const newDoseObj = {
+          id: Date.now(),
+          name: newMedName,
+          dose: newMedDose,
+          times: newMedTimes.filter(Boolean),
+          taken: false,
+          icon: randomEmoji,
+          color: "from-indigo-200 to-pink-200"
+        };
+
+        setMedications([...medications, newDoseObj]);
+        setWeeklyHistory(prev => prev.map(item => item.day === '今天' ? { ...item, total: item.total + 1 } : item));
+        setNewMedName("");
+        setNewMedDose("");
+        setNewMedTimes(["08:00"]);
+        setShowNewMedModal(false);
+        setBubbleText("新安排了药丸！小伙伴会替你记牢的！📝");
+        showToast("✅ 成功添加新服药提醒计划");
+      };
+
+      const deleteMedication = (id) => {
+        setMedications(prev => prev.filter(med => med.id !== id));
+        setBubbleText("这颗药丸任务已经从小本本里移除啦。");
+        showToast("已删除药物提醒");
+      };
+
+      // F11.2 药盒拍照识别：拍一张 → AI 提取草稿 → 人工确认后才落库（安全边界）
+      const handleVisionScan = async (file) => {
+        if (!file) return;
+        setVisionBusy(true); setVisionDraft(null);
+        showToast("📷 正在识别药盒，请稍候…");
+        const b64 = await blobToBase64(file);
+        const res = await callAI({ op: "vision", code: AI_CODE, imageBase64: b64 }, 30000);
+        setVisionBusy(false);
+        if (res && res.ok && Array.isArray(res.meds) && res.meds.length) {
+          // F11.6 兜底：vision 返回的所有文本字段都要过滤医疗红线词。
+          // notes 是最危险的一个——模型爱在这里写「建议加大剂量/停药」，且会直接渲染到 UI。
+          const safeMeds = res.meds.map(m => ({
+            ...m,
+            name: sanitizeAIText(m.name),
+            dose: sanitizeAIText(m.dose),
+            notes: sanitizeAIText(m.notes),
+          }));
+          setVisionDraft(safeMeds);
+          showToast(`✅ 识别到 ${safeMeds.length} 种药，请核对后确认`);
+        } else {
+          showToast("识别结果为空，请手动填写或换张更清晰的照片");
+        }
+      };
+
+      const applyVisionDraft = (med) => {
+        const emojis = ["💊", "🍬", "🍼", "🍵", "🔮"];
+        setNewMedName(med.name || "");
+        setNewMedDose(med.dose || "");
+        setNewMedTimes((med.times && med.times.length) ? med.times : ["08:00"]);
+        setVisionDraft(null);
+        showToast("已填入草稿，请核对后点「确认派发」");
+      };
+
+      // F11.3 医嘱语音速记：按住录 → 松开转文字 → 追加进医嘱内容框（人工再确认保存）
+      const appendMedContent = (t) => {
+        const s = (t || "").trim();
+        if (!s) return;
+        setNewLog((prev) => ({ ...prev, content: (prev.content ? prev.content + " " : "") + s }));
+      };
+      const startMedDictation = () => {
+        // 双保险：medRecState 挡住 thinking 阶段，medTalkingRef（同步）挡住 state 未及更新的快速重按
+        if (medRecState !== "idle" || medTalkingRef.current) return;
+        medTalkingRef.current = true;
+        medHandoffRef.current = false;
+        const SR = (typeof window !== "undefined") && (window.SpeechRecognition || window.webkitSpeechRecognition);
+        if (SR) {
+          try {
+            const r = new SR();
+            r.lang = "zh-CN"; r.continuous = true; r.interimResults = false;
+            let txt = "";
+            r.onresult = (ev) => { for (let i = ev.resultIndex; i < ev.results.length; i++) txt += ev.results[i][0].transcript; };
+            r.onerror = () => {
+              // 微信 X5 内核常拒 Web Speech —— 无缝转 MediaRecorder + 服务端 ASR（不再死寂）
+              medRecRef.current = null;
+              if (medTalkingRef.current) {
+                medHandoffRef.current = true;   // 标记已交棒，onend 不得再跑
+                showToast("🎙️ 正在用录音方式，继续说完再松开");
+                startMedMediaCapture();
+              } else {
+                setMedRecState("idle");         // 已松手：别卡在 recording
+              }
+            };
+            r.onend = () => {
+              medRecRef.current = null;
+              if (medHandoffRef.current) return; // 已交棒给 media，这条 onend 空转
+              medTalkingRef.current = false;
+              appendMedContent(txt);
+              setMedRecState("idle");
+            };
+            medRecRef.current = { type: "speech", obj: r };
+            setMedRecState("recording");
+            r.start();
+            return;
+          } catch { /* 转录音方案 */ }
+        }
+        startMedMediaCapture();
+      };
+
+      // ② MediaRecorder 录音 → 服务端 ASR（SR 不可用或被拒时的兜底）
+      const startMedMediaCapture = async () => {
+        const canMedia = typeof navigator !== "undefined" && navigator.mediaDevices &&
+          navigator.mediaDevices.getUserMedia && typeof window.MediaRecorder !== "undefined";
+        if (!canMedia) {
+          medTalkingRef.current = false; setMedRecState("idle");
+          showToast("这个环境不支持语音，请手动输入");
+          return;
+        }
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          // 授权/交棒期间可能已松手 —— 立刻释放麦克风，杜绝录音红点常亮
+          if (!medTalkingRef.current) {
+            try { stream.getTracks().forEach((t) => t.stop()); } catch {}
+            medRecRef.current = null; setMedRecState("idle");
+            showToast("按住录音键，说完再松开哦");
+            return;
+          }
+          const mr = new window.MediaRecorder(stream);
+          const chunks = [];
+          mr.ondataavailable = (ev) => { if (ev.data && ev.data.size) chunks.push(ev.data); };
+          mr.onstop = async () => {
+            try { stream.getTracks().forEach((t) => t.stop()); } catch {}
+            medTalkingRef.current = false;
+            if (!chunks.length) { medRecRef.current = null; setMedRecState("idle"); showToast("没录到声音，请再试一次"); return; }
+            setMedRecState("thinking");
+            const blob = new Blob(chunks, { type: mr.mimeType || "audio/webm" });
+            const b64 = await blobToBase64(blob);
+            const fmt = (mr.mimeType || "webm").includes("mp4") ? "mp4" : "webm";
+            const res = await callAI({ op: "asr", code: AI_CODE, audioBase64: b64, format: fmt }, 20000);
+            // F11.6 兜底：语音转写落入医嘱框并会存库，过滤医疗红线词（家人会人工复核）
+            if (res && res.ok && res.text) appendMedContent(sanitizeAIText(res.text));
+            else showToast("没识别到内容，请手动补充");
+            medRecRef.current = null; setMedRecState("idle");
+          };
+          medRecRef.current = { type: "media", obj: mr, stream };
+          setMedRecState("recording");
+          mr.start();
+        } catch {
+          medTalkingRef.current = false; setMedRecState("idle");
+          showToast("要允许麦克风才能语音速记");
+        }
+      };
+      const stopMedDictation = () => {
+        // 松手即置位（权威信号）：即便录音器还没建好，await 后复检也能据此释放麦克风
+        medTalkingRef.current = false;
+        // 只认 ref（同步写入）：medRecState 是异步 state，快速按放时闭包里可能还是 "idle"，
+        // 拿它当条件会漏掉 stop() → 麦克风常亮。已停止的对象再 stop 会抛，try 吞掉即可。
+        const cur = medRecRef.current;
+        if (cur) { try { cur.obj.stop(); } catch {} }
+      };
+
+      const updateMedTime = (index, value) => {
+        setNewMedTimes(prev => prev.map((time, i) => i === index ? value : time));
+      };
+
+      const addMedTimeField = () => {
+        setNewMedTimes(prev => [...prev, "12:00"]);
+      };
+
+      const removeMedTimeField = (index) => {
+        setNewMedTimes(prev => prev.filter((_, i) => i !== index));
+      };
+
+      const savePetChoice = (pet, petProfile) => {
+        localStorage.setItem(PET_STORAGE_KEY, JSON.stringify({
+          id: pet.id,
+          savedAt: new Date().toISOString(),
+          selectedPet: petProfile
+        }));
+      };
+
+      const selectPet = (pet) => {
+        const nextProfile = makeSelectedPet(pet, selectedPet);
+        setPetCollection(prev => prev.map(item => ({ ...item, selected: item.id === pet.id })));
+        setSelectedPet(nextProfile);
+        savePetChoice(pet, nextProfile);
+        setIsChangingPet(false);
+        setPetReactState(pet.state === 'float' ? 'happy' : 'sad');
+        setBubbleText(pet.state === 'float' ? `${pet.name}跳进药宝庄园啦！下次打开我也只显示它。` : `${pet.name}需要更多按时喂食来恢复元气。`);
+      };
+
+      const addMedicalLog = (e) => {
+        e.preventDefault();
+        if (!newLog.hospital || !newLog.doctor || !newLog.content) return;
+        const log = {
+          id: Date.now(),
+          hospital: newLog.hospital,
+          doctor: newLog.doctor,
+          visitDate: new Date().toISOString().slice(0, 10),
+          followDate: newLog.followDate || "待确认",
+          content: newLog.content,
+          tags: ["新增", "医嘱"]
+        };
+        setMedicalLogs([log, ...medicalLogs]);
+        setExpandedLogId(log.id);
+        setNewLog({ hospital: "", doctor: "", followDate: "", content: "" });
+        showToast("📋 医嘱记录已保存");
+      };
+
+      // Toast feedback helper
+      const showToast = (msg) => {
+        setToastMsg(msg);
+        setTimeout(() => {
+          setToastMsg("");
+        }, 3000);
+      };
+
+      // 写操作要带的 PIN：演示家庭用公开 PIN，普通家庭用本机保存的 admin PIN。
+      const pinForWrite = () => (familyId === DEMO_FAMILY_ID ? DEMO_PIN : adminPin);
+
+      // 配置签名：只看「内容」不看 id，这样服务端把本地整数 id 换成 uuid 后，
+      // 签名仍相等 → 防抖保存不会反复回写（apply→save→apply 抖动）。
+      const configSignature = (o) => JSON.stringify({
+        pet: o.selectedPetId,
+        elder: o.family?.elderName || "",   // 关注对象称呼也参与签名，否则改称呼会被判「无变化」而不回写
+        meds: (o.medications || []).map(m => [m.name, m.dose, (m.times || []).join(","), m.icon, m.color]),
+        members: (o.familyMembers || []).map(m => [m.name, m.relation, m.avatar]),
+        logs: (o.medicalLogs || []).map(l => [l.hospital, l.doctor, l.content, (l.tags || []).join(",")]),
+      });
+
+      // ---- 服务端快照落地（唯一入口）----
+      // yb_snapshot 契约（若某字段对不上，改 SQL 让它符合这个形状，别在这里散兼容分支）：
+      //   { family:{code,displayName,elderName,fontScale,highContrast,voiceEnabled},
+      //     selectedPetId, selectedPet:{level,points,targetPoints,healthIndex,status,lastFeedTime},
+      //     streakDays, lastTakeDate,
+      //     medications:[{id,name,dose,times,taken,icon,color,mealRel,source}],
+      //     weeklyHistory:[{day,done,total}],
+      //     familyMembers:[{id,name,relation,avatar,phone}],
+      //     medicalLogs:[{id,hospital,doctor,visitDate,followDate,content,tags}],
+      //     events:[{id,type:'mom_take'|'admin_note',...,at}] }
+      const applyServerSnapshot = (snap, source) => {
+        if (!snap || typeof snap !== "object") return false;
+        const petId = snap.selectedPetId || savedPetData.pet.id;
+        const petMeta = defaultPets.find(item => item.id === petId) || savedPetData.pet;
+        const sp = snap.selectedPet || {};
+        const profile = makeSelectedPet(petMeta, {
+          level: sp.level, points: sp.points, targetPoints: sp.targetPoints,
+          healthIndex: sp.healthIndex ?? sp.health,   // 服务端列名是 pet_health，容忍两种键名
+          status: sp.status, lastFeedTime: sp.lastFeedTime,
+        });
+        setPetCollection(defaultPets.map(item => ({ ...item, selected: item.id === petId })));
+        setSelectedPet(profile);
+        if (source !== "local") savePetChoice(petMeta, profile);
+
+        if (typeof snap.streakDays === "number") setStreakDays(snap.streakDays);
+        if (snap.family && typeof snap.family.elderName === "string") setElderName(snap.family.elderName);
+        if (typeof snap.lastTakeDate === "string") setLastTakeDate(snap.lastTakeDate);
+        if (Array.isArray(snap.medications)) {
+          const evs = Array.isArray(snap.events) ? snap.events : [];
+          setMedications(snap.medications.map(m => {
+            const times = m.times || [];
+            // 优先用服务端 events 流重建今日 takenSlots（跨端权威）；
+            // events 里没有该药记录时回退到 m.takenSlots / m.taken（兼容单剂次与历史日志）
+            const fromEvents = reconstructTakenSlots(m.id, times, evs);
+            const takenSlots = fromEvents != null
+              ? fromEvents
+              : (m.takenSlots || (m.taken ? times : []));
+            // taken 由 takenSlots 反推：所有时段都勾了才算整药完成
+            const taken = times.length > 0
+              ? takenSlots.length >= times.length
+              : !!m.taken;
+            return { ...m, takenSlots, taken };
+          }));
+        }
+        if (Array.isArray(snap.weeklyHistory)) setWeeklyHistory(snap.weeklyHistory);
+        if (Array.isArray(snap.familyMembers)) setFamilyMembers(snap.familyMembers);
+        if (Array.isArray(snap.events)) setEvents(snap.events);
+        if (Array.isArray(snap.medicalLogs)) {
+          setMedicalLogs(snap.medicalLogs);
+          if (snap.medicalLogs[0]?.id != null) setExpandedLogId(snap.medicalLogs[0].id);
+        }
+        // 记下服务端权威配置签名，随后的防抖保存据此判定「无需回写」
+        lastCfgSigRef.current = configSignature({
+          selectedPetId: petId,
+          family: { elderName: snap.family?.elderName || "" },
+          medications: snap.medications,
+          familyMembers: snap.familyMembers,
+          medicalLogs: snap.medicalLogs,
+        });
+        return true;
+      };
+
+      // 收到 Realtime 广播后重新拉一份权威快照（对端改了什么我不关心，直接以服务端为准）
+      const refetchSnapshot = () => {
+        cloudGet(familyId).then(s => { if (s) applyServerSnapshot(s, "rpc"); }).catch(() => {});
+      };
+
+      const selectedPetMeta = petCollection.find(p => p.selected) || petCollection[0];
+      const visiblePets = isChangingPet ? petCollection : petCollection.filter(pet => pet.selected);
+      const isCompactMobileStage = currentTab !== 'home';
+
+      // ---- Hydrate from Supabase（离线兜底：localStorage）+ 订阅 Realtime ----
+      useEffect(() => {
+        let aborted = false;
+
+        const seedFromLocal = () => {
+          try {
+            const localData = JSON.parse(
+              localStorage.getItem(APP_DATA_STORAGE_KEY + ":" + familyId) ||
+              localStorage.getItem(APP_DATA_STORAGE_KEY) || "null"
+            );
+            if (!localData) return;
+            // 缓存可能是昨天（或更早）的：配置类数据（药品/家人/医嘱/宠物）照用，
+            // 但服药勾选必须清空，否则次日离线打开会显示「今天都吃过了」→ 一整天零提醒。
+            const stale = localData._cachedDate !== todayKey();
+            const seed = stale
+              ? {
+                  ...localData,
+                  lastTakeDate: undefined,   // 别让昨天的日期干扰 streak 判定
+                  events: [],                // events 用于重建 takenSlots，陈旧的一律丢弃
+                  medications: (localData.medications || []).map(m => ({ ...m, taken: false, takenSlots: [] })),
+                  weeklyHistory: (localData.weeklyHistory || []).map(item => item.day === '今天' ? { ...item, done: 0 } : item),
+                }
+              : localData;
+            applyServerSnapshot(seed, "local");
+            if (stale) dayKeyRef.current = todayKey();
+          } catch {}
+        };
+
+        const subscribe = () => {
+          try { channelRef.current?.close(); } catch {}
+          // 自己写的通知不回弹（self:false），只在对端改动时重新拉取
+          channelRef.current = openFamilyChannel(familyId, () => { if (!aborted) refetchSnapshot(); });
+        };
+
+        const hydrate = async () => {
+          setCloudStatus("loading");
+          setCloudError("");
+          try {
+            const snap = await cloudGet(familyId);   // 家庭存在 → 快照；不存在 → null
+            if (aborted) return;
+
+            if (snap) {
+              applyServerSnapshot(snap, "cloud");
+              // 打上日期戳：次日离线打开时据此剥掉昨天的服药状态（见 seedFromLocal）
+              try { localStorage.setItem(APP_DATA_STORAGE_KEY + ":" + familyId, JSON.stringify({ ...snap, _cachedDate: todayKey() })); } catch {}
+              setCloudStatus("synced");
+              appDataHydratedRef.current = true;
+              subscribe();
+              return;
+            }
+
+            // 家庭不存在
+            if (familyId === DEMO_FAMILY_ID) {
+              // 演示家庭：用静态种子首次建库（并发首访可能撞 family_exists，回退到重新拉取）
+              try {
+                const seedRes = await fetch('./clay-buddy-data.json', { cache: 'no-store' });
+                const seed = seedRes.ok ? await seedRes.json() : {};
+                let created;
+                try {
+                  created = await cloudCreateFamily(DEMO_FAMILY_ID, DEMO_PIN, {
+                    displayName: "演示家庭", elderName: "妈妈",
+                    payload: {
+                      selectedPetId: seed.selectedPetId,
+                      medications: seed.medications,
+                      familyMembers: seed.familyMembers,
+                      medicalLogs: seed.medicalLogs,
+                    },
+                  });
+                } catch (e) {
+                  if (/family_exists/.test(e.message || "")) created = await cloudGet(DEMO_FAMILY_ID);
+                  else throw e;
+                }
+                if (aborted) return;
+                if (created) applyServerSnapshot(created, "cloud");
+                setCloudStatus("synced");
+                appDataHydratedRef.current = true;
+                subscribe();
+              } catch (e) {
+                console.warn("demo seed failed", e);
+                seedFromLocal();
+                setCloudStatus("error");
+                setCloudError(String(e.message || e));
+                appDataHydratedRef.current = true;
+              }
+              return;
+            }
+
+            // admin：弹创建流，状态正常；mom：设了 cloudError，要把状态也设为 error，否则守卫看不到
+            if (viewMode === "admin") { setCreateFamilyOpen(true); setCloudStatus("synced"); }
+            else { setCloudError("该链接对应的家庭还没有建好。请联系给你这个链接的家人。"); setCloudStatus("error"); }
+            appDataHydratedRef.current = true;
+            return;
+          } catch (err) {
+            console.warn("cloud GET failed, fallback to local", err);
+            seedFromLocal();
+            setCloudError(String(err.message || err));
+            setCloudStatus("error");
+            appDataHydratedRef.current = true;
+          }
+        };
+
+        hydrate();
+        return () => {
+          aborted = true;
+          try { channelRef.current?.close(); } catch {}
+          channelRef.current = null;
+        };
+      }, [familyId]);
+
+      // ---- 防抖保存配置（仅 admin/demo）+ localStorage 镜像 ----
+      // 只覆盖「配置类」数据：药品、家人、医嘱、宠物换装。服药积分/健康/连续天数由
+      // yb_log_dose 独占写入，不在这里回写，避免两条写路径打架。
+      useEffect(() => {
+        if (!appDataHydratedRef.current) return;
+        const selectedPetId = (petCollection.find(pet => pet.selected) || selectedPetMeta)?.id;
+        const payload = {
+          selectedPetId,
+          selectedPet: { level: selectedPet.level, points: selectedPet.points, healthIndex: selectedPet.healthIndex },
+          // 关注对象的称呼（妈妈/爸爸/奶奶/老伴…）：服务端 yb_save_config 已支持 family.elderName
+          family: { elderName },
+          streakDays,
+          lastTakeDate,
+          medications,
+          familyMembers,
+          medicalLogs,
+        };
+        // localStorage 镜像 — 离线 fallback 用（带日期戳，次日读取时剥掉昨天的服药状态）
+        try { localStorage.setItem(APP_DATA_STORAGE_KEY + ":" + familyId, JSON.stringify({ ...payload, _cachedDate: todayKey() })); } catch {}
+
+        if (viewMode === "mom") return;                       // 妈妈端不写配置
+        const pin = pinForWrite();
+        if (!pin) return;                                     // 无 PIN（未创建/未授权）不写
+
+        const sig = configSignature(payload);
+        if (sig === lastCfgSigRef.current) return;            // 与服务端一致，无需回写
+
+        if (writeTimerRef.current) clearTimeout(writeTimerRef.current);
+        writeTimerRef.current = setTimeout(async () => {
+          try {
+            const snap = await cloudSaveConfig(familyId, payload, pin);
+            lastCfgSigRef.current = sig;                       // 先记签名，避免 apply 的 setState 触发再存
+            applyServerSnapshot(snap, "rpc");                  // 服务端把整数 id 换成 uuid，回填对齐
+            channelRef.current?.notify();
+            setCloudStatus("synced");
+          } catch (err) {
+            console.warn("cloud saveConfig failed", err);
+            setCloudStatus("error");
+            setCloudError(String(err.message || err));
+          }
+        }, 800);
+        return () => { if (writeTimerRef.current) clearTimeout(writeTimerRef.current); };
+        // petCollection 必须在依赖里：selectedPetId 是从它算出来的，
+        // 少了它「换宠物」只改本地不回写云端（老人端下次拉快照就被覆盖回去）
+      }, [selectedPet, petCollection, streakDays, lastTakeDate, medications, familyMembers, medicalLogs, elderName, familyId, adminPin, viewMode]);
+
+      // -------- 服药提醒引擎：走时的钟 + 到点派发（F2.2）----------
+      const [now, setNow] = useState(() => new Date());
+      const [notifyPerm, setNotifyPerm] = useState(
+        () => (typeof Notification !== "undefined" ? Notification.permission : "unsupported")
+      );
+      const notifiedRef = useRef({});   // 每个时段每天只提醒一次：key = 日期|药id|时段
+
+      // 每 30s 走一次，同时挂载即对齐一次
+      // 30s 心跳推进 now；同时检测「跨天」——老人的平板常整夜不关，
+      // 一旦跨过 00:00 必须把昨天的服药勾选清空，否则当天 pending 全空 → 一整天零提醒（漏服安全问题）。
+      useEffect(() => {
+        const t = setInterval(() => {
+          const d = new Date();
+          const k = todayKey();
+          if (k !== dayKeyRef.current) {
+            dayKeyRef.current = k;
+            // 新的一天：清空所有药的服用状态（服务端 dose_logs 按 local_date 存，不受影响）
+            setMedications(prev => prev.map(m => ({ ...m, taken: false, takenSlots: [] })));
+            notifiedRef.current = {};             // 通知去重表按天清空（key 含日期，清掉释放内存即可）
+            setWeeklyHistory(prev => prev.map(item => item.day === '今天' ? { ...item, done: 0 } : item));
+            refetchSnapshot();                    // 顺便拉一份当天权威快照
+          }
+          setNow(d);
+        }, 30000);
+        return () => clearInterval(t);
+      }, []);
+
+      // #11：新药拿到服务端 UUID 后（medications 被快照回写），补发之前暂存的服药日志
+      useEffect(() => { flushPendingDoses(medications); }, [medications]);
+
+      const reminders = useMemo(() => computeReminders(medications, now), [medications, now]);
+
+      // F11.4：家人端定期拉取健康关心信号（老人语音陪伴时被静默记录）。仅 admin 端。
+      useEffect(() => {
+        if (viewMode !== "admin") return;
+        let alive = true;
+        const load = () => cloudHealthRecent(familyId, 14)
+          .then((rows) => { if (alive && Array.isArray(rows)) setHealthSignals(rows); })
+          .catch(() => {});
+        load();
+        const t = setInterval(load, 60000);
+        return () => { alive = false; clearInterval(t); };
+      }, [familyId, viewMode]);
+
+      // F11.4：把原始信号收敛成家人端"健康关心"卡片数据。
+      // 按 kind 去重取最新一条，最多 4 条，只保留近 14 天。措辞由 signalLabel 统一兜底为中性。
+      const healthCare = useMemo(() => {
+        const seen = new Set();
+        const out = [];
+        for (const s of healthSignals) {
+          if (!s || seen.has(s.kind)) continue;
+          seen.add(s.kind);
+          out.push(s);
+          if (out.length >= 4) break;
+        }
+        return out;
+      }, [healthSignals]);
+      // 关注对象的称呼：全局唯一来源。药宝不假设只服务「妈妈」——爸爸/奶奶/老伴/张阿姨都行。
+      // 家人在【家庭配置 · 关注谁】里填，存云端 yb_families.elder_name，两端同步。
+      const elderCall = (elderName || "").trim() || "妈妈";
+
+      // 「上次喂食」从 events 流派生：服务端 yb_families 没有 last_feed 列，
+      // 而 events 里每条 mom_take 都带 at（timestamptz），够算了 —— 不用改表，且两端同源。
+      // 只认 taken:true 的最近一条；撤销（taken:false）不算喂食。
+      const lastFeedLabel = useMemo(() => {
+        const rows = (events || [])
+          .filter(e => e && e.type === "mom_take" && e.taken)
+          .map(e => new Date(e.at))
+          .filter(d => !isNaN(d.getTime()))
+          .sort((a, b) => b - a);
+        if (!rows.length) return "还没有记录";
+        const d = rows[0];
+        const hm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+        const dayOf = (x) => `${x.getFullYear()}-${x.getMonth()}-${x.getDate()}`;
+        const now = new Date();
+        const yest = new Date(); yest.setDate(yest.getDate() - 1);
+        if (dayOf(d) === dayOf(now)) {
+          const mins = Math.floor((now - d) / 60000);
+          if (mins < 1) return "刚刚 确认服药";
+          if (mins < 60) return `${mins} 分钟前`;
+          return `今天 ${hm}`;
+        }
+        if (dayOf(d) === dayOf(yest)) return `昨天 ${hm}`;
+        return `${d.getMonth() + 1}/${d.getDate()} ${hm}`;
+      }, [events, now]);
+
+      // 到点派发：系统通知（若已授权）+ 应用内气泡提醒。每个时段每天只发一次。
+      useEffect(() => {
+        if (!appDataHydratedRef.current) return;
+        const key = todayKey();
+        let firstNew = null;
+        for (const p of reminders.pending) {
+          const k = `${key}|${p.med.id}|${p.refMin}`;
+          if (notifiedRef.current[k]) continue;
+          notifiedRef.current[k] = true;
+          if (!firstNew) firstNew = p;
+        }
+        if (!firstNew) return;
+        const medName = firstNew.med.name;
+        const title = viewMode === "mom" ? "该吃药啦 💊" : `提醒：${elderCall}该吃「${medName}」了`;
+        const body = viewMode === "mom"
+          ? `现在是「${medName}」的服药时间，吃完记得点"我吃了"哦`
+          : `${fmtHM(firstNew.refMin)} 的「${medName}」还没记录，去提醒一下${elderCall}吧`;
+        if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+          try { new Notification(title, { body, tag: `yb-${firstNew.med.id}-${firstNew.refMin}` }); } catch {}
+        }
+        // 应用内提醒气泡（不依赖系统通知，微信内也生效）
+        setBubbleText(viewMode === "mom"
+          ? `主人，「${medName}」到点啦，我们一起把它吃掉好不好？💊`
+          : `${elderCall}的「${medName}」到点还没吃哦`);
+        // 语音朗读（若已开启且浏览器支持；首次需用户手势，之后自动）
+        speak(viewMode === "mom" ? `该吃${medName}啦` : `${elderCall}该吃${medName}了`);
+      }, [reminders, viewMode]);
+
+      // 供 UI 高亮的到点药 id 集合
+      const dueMedIds = useMemo(
+        () => new Set(reminders.pending.map((p) => String(p.med.id))),
+        [reminders]
+      );
+
+      // 请求系统通知授权（设置页按钮触发）
+      const requestNotifyPermission = () => {
+        if (typeof Notification === "undefined") { setNotifyPerm("unsupported"); showToast("当前环境不支持系统通知，应用内提醒仍会照常工作"); return; }
+        Notification.requestPermission().then((p) => {
+          setNotifyPerm(p);
+          showToast(p === "granted" ? "🔔 已开启到点系统提醒" : "未开启系统通知，应用内提醒仍会工作");
+        }).catch(() => showToast("开启失败，应用内提醒仍会工作"));
+      };
+
+      // 提醒条主文案（两端通用，措辞遵守 §6.3）
+      const reminderLine = (() => {
+        const { pending, upcoming } = reminders;
+        if (pending.length) {
+          const top = pending[0];
+          const soft = top.overdue ? "别忘了" : "现在该吃";
+          // pending 现在按「时段」拆分，同一种药可能占多条 —— 措辞按「药品种数」计，
+          // 否则一种药的两剂会被说成「还有 1 种」，老人看不懂。
+          const otherMeds = new Set(
+            pending.filter(p => String(p.med.id) !== String(top.med.id)).map(p => String(p.med.id))
+          ).size;
+          const extra = otherMeds > 0 ? `（还有 ${otherMeds} 种也到点了）` : "";
+          return viewMode === "mom"
+            ? { tone: "due", text: `${soft}「${top.med.name}」${extra}`, med: top.med, slot: top.slot }
+            : { tone: "due", text: `${elderCall}${soft}「${top.med.name}」${extra}`, med: top.med, slot: top.slot };
+        }
+        if (medications.length && medications.every((m) => m.taken)) {
+          return { tone: "done", text: viewMode === "mom" ? "今天的药都吃完啦，真棒！🎉" : `${elderCall}今天的药都吃完啦 🎉`, med: null };
+        }
+        if (upcoming.length) {
+          const n = upcoming[0];
+          return { tone: "upcoming", text: `下一次服药 ${fmtHM(n.nextMin)} · ${n.med.name}`, med: null };
+        }
+        return null;
+      })();
+
+      // ================= 适老化无障碍（Task #6）=================
+      // 字号 / 朗读 / 高对比是"这台设备、这个人"的偏好，本机持久化，与家庭云配置解耦：
+      // 妈妈端无 PIN 也能自己调，且妈妈手机与家人手机各自独立、互不干扰。
+      // mom 与 admin 是不同的页面加载，缩放根字号只影响当前这一个视图。
+      const A11Y_KEY = "yb:a11y:" + (launch.family || "demo");
+      const [a11y, setA11yState] = useState(() => {
+        const base = { fontScale: "normal", voiceOn: true, highContrast: false };
+        try { return { ...base, ...(JSON.parse(localStorage.getItem(A11Y_KEY) || "null") || {}) }; }
+        catch { return base; }
+      });
+      const setA11y = (patch) => setA11yState((prev) => {
+        const next = { ...prev, ...patch };
+        try { localStorage.setItem(A11Y_KEY, JSON.stringify(next)); } catch {}
+        return next;
+      });
+
+      // 根字号三档：标准 16 / 大 18 / 超大 20（用 rem-based 的 Tailwind 文本会整体放大）
+      useEffect(() => {
+        const px = { normal: "", large: "18px", huge: "20px" }[a11y.fontScale] || "";
+        document.documentElement.style.fontSize = px;
+        return () => { document.documentElement.style.fontSize = ""; };
+      }, [a11y.fontScale]);
+
+      // 高对比：加深灰字、强化描边（仅在开启时叠加，默认关闭，不改动原配色）
+      useEffect(() => {
+        document.body.classList.toggle("yb-hc", !!a11y.highContrast);
+        return () => document.body.classList.remove("yb-hc");
+      }, [a11y.highContrast]);
+
+      // 语音朗读（TTS）。浏览器要求首个语音需用户手势触发，因此自动朗读在首次交互前
+      // 可能被拦截——但手动🔊按钮始终有效，之后自动朗读也会放开。微信 X5 内核支持。
+      const speak = (text) => {
+        if (!a11y.voiceOn) return;
+        try {
+          if (typeof window.speechSynthesis === "undefined") return;
+          const clean = String(text || "").replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}→✓•·⭐]/gu, "").trim();
+          if (!clean) return;
+          window.speechSynthesis.cancel();
+          const u = new SpeechSynthesisUtterance(clean);
+          u.lang = "zh-CN"; u.rate = 0.95; u.pitch = 1.0;
+          window.speechSynthesis.speak(u);
+        } catch {}
+      };
+      const ttsSupported = typeof window !== "undefined" && typeof window.speechSynthesis !== "undefined";
+
+      // ================= F11.1 会说话的小动物：语音情感陪伴 =================
+      // 要解决的关键难题：老人不会打字 —— 输入方式对他们不可用。所以让他们「说话」。
+      // 分层降级：① 浏览器 Web Speech API（zh-CN，最稳）→ ② MediaRecorder 录音 + 服务端 ASR
+      // → ③ 都不行时，宠物仍用预置暖心话陪伴（demo 永远有回应）。
+      const AI_CODE = launch.family || DEMO_FAMILY_ID; // 家庭码即调用闸门
+      const [aiPhase, setAiPhase] = useState("idle");  // idle | listening | thinking
+      const [micState, setMicState] = useState("unknown"); // unknown | denied | unsupported
+      const aiPhaseRef = useRef("idle");
+      const recRef = useRef(null); // { type:'speech'|'media', obj, stream? }
+      const talkingRef = useRef(false);
+      const mediaHandoffRef = useRef(false); // SR 出错后是否已交棒给 MediaRecorder（供 onend 判别，避免竞态双跑）
+      const setPhase = (p) => { aiPhaseRef.current = p; setAiPhase(p); };
+
+      // 拿到一句话文本后：调宠物人格对话，成功用回复、失败用兜底文案，都会朗读。
+      const aiReply = async (userText, audioMs) => {
+        setPhase("thinking");
+        setBubbleText("让我想想…💭");
+        const res = await callAI({
+          op: "chat", code: AI_CODE, text: userText, audioMs: audioMs || null,
+          petName: selectedPet.name, elderName: elderName || "", localDate: todayKey(),
+        }, 15000);
+        // 降级兜底分两级（#6）：先看这句话里有没有身体不适信号。
+        // 有 → 用「引导就医 + 会转达家人」话术（F11.6:511 硬要求）；没有 → 随机暖心话。
+        const localKind = detectLocalSignal(userText);
+        const fallback = localKind ? (CARE_REPLIES[localKind] || pickFallbackReply()) : pickFallbackReply();
+        const raw = (res && res.ok && res.reply) ? res.reply : fallback;
+        // F11.6 兜底：宠物对老人说的话若含医疗红线词，整句丢弃换安全话术（老人端不该看到「【已过滤】」）
+        const reply = MEDICAL_REDLINE.some(w => String(raw).includes(w)) ? fallback : raw;
+        setBubbleText(reply);
+        setPetReactState("happy");
+        setTimeout(() => setPetReactState("idle"), 1600);
+        speak(reply);
+        setPhase("idle");
+      };
+
+      const finishNoSpeech = () => {
+        talkingRef.current = false; recRef.current = null;
+        setPhase("idle");
+        setBubbleText("没听清呀，再按住我说一次好不好？");
+      };
+
+      // ② MediaRecorder 录音 → 服务端 ASR
+      const startMediaCapture = async () => {
+        const canMedia = typeof navigator !== "undefined" && navigator.mediaDevices &&
+          navigator.mediaDevices.getUserMedia && typeof window.MediaRecorder !== "undefined";
+        if (!canMedia) {
+          setMicState("unsupported");
+          talkingRef.current = false; setPhase("idle");
+          // 没有任何语音能力时，点一下也给一句暖心陪伴，demo 不至于「哑巴」
+          const line = pickFallbackReply();
+          setBubbleText(line); speak(line);
+          return;
+        }
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          // 关键：授权/交棒期间用户可能已松手 —— 若已松手，立刻释放麦克风，杜绝录音红点常亮
+          if (!talkingRef.current) {
+            try { stream.getTracks().forEach((t) => t.stop()); } catch {}
+            recRef.current = null;
+            setPhase("idle");
+            setBubbleText("按住我，说完再松开就好啦~");
+            return;
+          }
+          const mime = window.MediaRecorder.isTypeSupported && window.MediaRecorder.isTypeSupported("audio/webm")
+            ? "audio/webm" : "";
+          const mr = new window.MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+          const chunks = []; const startedAt = Date.now();
+          mr.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+          mr.onstop = async () => {
+            try { stream.getTracks().forEach((t) => t.stop()); } catch {}
+            talkingRef.current = false; recRef.current = null;
+            const audioMs = Date.now() - startedAt;
+            if (!chunks.length) { finishNoSpeech(); return; }
+            // 按住太短（通常是轻点而非按住）→ 引导正确手势，不把空音频发给 ASR（防老人轻点导致"哑火"）
+            if (audioMs < 500) {
+              const line = "要按住我一直说，说完再松开哦~ 🎤";
+              setBubbleText(line); speak(line); setPhase("idle");
+              return;
+            }
+            setPhase("thinking"); setBubbleText("让我听听你说的…👂");
+            const blob = new Blob(chunks, { type: mr.mimeType || "audio/webm" });
+            const b64 = await blobToBase64(blob);
+            const fmt = (mr.mimeType || "webm").includes("mp4") ? "mp4" : "webm";
+            const asr = await callAI({ op: "asr", code: AI_CODE, audioBase64: b64, format: fmt }, 20000);
+            const said = (asr && asr.ok && asr.text) ? String(asr.text).trim() : "";
+            if (said) { aiReply(said, audioMs); }
+            else {
+              // 转写不可用（Key 未配置/超时）：拿不到文本就无法识别不适信号，
+              // 所以话术里主动留一句「不舒服要告诉家人」，别让这条路把关心弄丢了。
+              const line = "我听见你的声音啦，就是没太听清呢。要是身体不舒服，一定要告诉家人哦 💛";
+              setBubbleText(line); speak(line); setPhase("idle");
+            }
+          };
+          recRef.current = { type: "media", obj: mr, stream };
+          setMicState("ok"); setPhase("listening"); setBubbleText("我在听…🎙️ 松开就好");
+          mr.start();
+        } catch (e) {
+          setMicState("denied");
+          talkingRef.current = false; setPhase("idle");
+          setBubbleText("要允许用麦克风，我才能听你说话哦~");
+        }
+      };
+
+      // ① Web Speech API（首选）
+      const startListening = () => {
+        if (talkingRef.current) return;
+        talkingRef.current = true;
+        mediaHandoffRef.current = false; // 新一次按住：清掉上次的交棒标记
+        const SR = (typeof window !== "undefined") && (window.SpeechRecognition || window.webkitSpeechRecognition);
+        if (SR) {
+          try {
+            const rec = new SR();
+            rec.lang = "zh-CN"; rec.interimResults = true; rec.maxAlternatives = 1; rec.continuous = false;
+            let finalText = "";
+            rec.onresult = (e) => {
+              finalText = "";
+              for (let i = 0; i < e.results.length; i++) finalText += e.results[i][0].transcript;
+              if (finalText) setBubbleText("我听到：" + finalText);
+            };
+            rec.onerror = () => {
+              // 常见于微信内核不放行 —— 无缝转 MediaRecorder 方案
+              recRef.current = null;
+              if (talkingRef.current) {
+                mediaHandoffRef.current = true;  // 标记已交棒，onend 不得再跑
+                startMediaCapture();
+              } else {
+                setPhase("idle");  // 用户已松手：别卡在 listening 脉冲
+              }
+            };
+            rec.onend = () => {
+              if (recRef.current && recRef.current.type === "speech") recRef.current = null;
+              // 若 onerror 已交棒给 media，这条 onend 空转（守卫竞态双跑）
+              if (mediaHandoffRef.current) return;
+              if (aiPhaseRef.current !== "listening") return;
+              const t = (finalText || "").trim();
+              talkingRef.current = false;
+              if (t) aiReply(t, null); else finishNoSpeech();
+            };
+            recRef.current = { type: "speech", obj: rec };
+            setMicState("ok"); setPhase("listening"); setBubbleText("我在听…🎙️ 松开就好");
+            rec.start();
+            return;
+          } catch (e) { /* 转下一层 */ }
+        }
+        startMediaCapture();
+      };
+
+      const stopListening = () => {
+        // 松手即置位：这是「用户已松手」的权威信号。
+        // 即便录音器还没建好（recRef 仍为 null，正卡在授权/交棒的 await 里），
+        // startMediaCapture 的 await 后复检也能据此立刻释放麦克风。
+        talkingRef.current = false;
+        const cur = recRef.current;
+        if (!cur) return;
+        try { cur.obj.stop(); } catch {}
+      };
+
+      // -------- Mom view: 妈妈这一端，零 onboarding，大字 ----------
+      if (viewMode === 'mom') {
+        const takenCount = medications.filter(m => m.taken).length;
+        const total = medications.length;
+        const remaining = total - takenCount;
+        const today = new Date();
+        const todayLabel = `${today.getMonth() + 1} 月 ${today.getDate()} 日`;
+        const weekdays = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
+        const weekday = weekdays[today.getDay()];
+        const recentNotes = events.filter(e => e.type === 'admin_note').slice(0, 3);
+
+        if (cloudError) {
+          return (
+            <div className="min-h-screen w-full flex items-center justify-center p-8 bg-rose-50">
+              <div className="clay-surface-soft p-6 max-w-md text-center space-y-3">
+                <p className="text-3xl">💌</p>
+                <p className="text-lg font-black text-slate-800">这个药宝还没准备好</p>
+                <p className="text-sm text-slate-600 leading-relaxed font-bold">请联系把这个链接发给你的家人，让 ta 在家庭配置里准备好你的药品。</p>
+              </div>
+            </div>
+          );
+        }
+
+        return (
+          <div className="w-full min-h-screen flex flex-col bg-gradient-to-b from-rose-50 via-amber-50 to-orange-50">
+            {/* Toast */}
+            {toastMsg && (
+              <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-rose-500 text-white font-bold px-6 py-4 rounded-2xl shadow-2xl text-base max-w-[90%]">
+                {toastMsg}
+              </div>
+            )}
+
+            <header className="px-6 pt-10 pb-4 text-center">
+              {/* 角色徽标：一眼区分这是老人端 */}
+              <div className="mb-3 flex justify-center">
+                <span className="inline-flex items-center gap-1.5 text-sm font-black bg-white/70 text-rose-500 px-4 py-1.5 rounded-full shadow-sm border border-rose-100">
+                  👵 {elderCall}的药宝
+                </span>
+              </div>
+              <p className="text-base font-bold text-slate-500">{todayLabel} · {weekday}</p>
+              <h1 className="mt-2 text-3xl font-black text-slate-800 leading-tight">
+                {familyMembers.length > 0 ? "为你准备好的药宝" : "今天的药宝"}
+              </h1>
+              <p className="mt-3 text-xl font-black text-rose-500">
+                {remaining > 0 ? `今天还要吃 ${remaining} 片药` : "今天的药都吃完啦！🎉"}
+              </p>
+            </header>
+
+            {/* 3D pet stage — bigger */}
+            <div className="mx-4 mb-4 rounded-[2rem] bg-white/60 backdrop-blur-sm shadow-inner overflow-hidden" style={{ height: 260 }}>
+              <ClayPet3D petId={selectedPet.id} petState={petVisualState} bubbleText={bubbleText} onPetClick={handlePetClick} />
+            </div>
+
+            {/* Bubble text */}
+            <div className="mx-6 mb-4 px-5 py-3 bg-white rounded-3xl shadow-sm border border-rose-100">
+              <p className="text-base font-bold text-slate-700 leading-relaxed text-center">{bubbleText}</p>
+            </div>
+
+            {/* F11.1 按住说话：老人不会打字，说话是唯一自然的输入 */}
+            <div className="mx-6 mb-5">
+              <button
+                onMouseDown={(e) => { e.preventDefault(); startListening(); }}
+                onMouseUp={(e) => { e.preventDefault(); stopListening(); }}
+                onMouseLeave={() => { if (aiPhase === 'listening') stopListening(); }}
+                onTouchStart={(e) => { e.preventDefault(); startListening(); }}
+                onTouchEnd={(e) => { e.preventDefault(); stopListening(); }}
+                disabled={aiPhase === 'thinking'}
+                className={`w-full min-h-[72px] rounded-3xl text-2xl font-black transition-all active:scale-95 shadow-lg flex items-center justify-center gap-3 select-none ${
+                  aiPhase === 'listening' ? 'bg-rose-600 text-white animate-pulse'
+                  : aiPhase === 'thinking' ? 'bg-slate-300 text-slate-600'
+                  : 'clay-btn-primary text-white'}`}
+                style={{ touchAction: 'none' }}
+              >
+                {aiPhase === 'listening' ? '🎙️ 松开就好' : aiPhase === 'thinking' ? '💭 想一想…' : '🎤 按住和我说话'}
+              </button>
+              {micState === 'denied' && (
+                <p className="mt-2 text-sm font-bold text-amber-600 text-center">要允许麦克风才能听你说话哦</p>
+              )}
+              {micState === 'unsupported' && (
+                <p className="mt-2 text-xs font-bold text-slate-400 text-center">这个手机不支持录音，我还是会陪你聊两句~</p>
+              )}
+              {/* F11.6 医疗免责：AI 陪伴不是医生。措辞遵守 §6.3，温和不制造焦虑 */}
+              <p className="mt-3 text-xs font-bold text-slate-400 text-center leading-relaxed">
+                我只是陪你说说话的小伙伴，不能替代医生哦。<br />身体不舒服，记得告诉家人、及时看医生 💛
+              </p>
+            </div>
+
+            {/* 到点提醒条（F2.2）—— 措辞遵守 §6.3，不指责、不制造焦虑 */}
+            {reminderLine && (
+              <div className={`mx-6 mb-4 rounded-3xl p-5 border-2 ${
+                reminderLine.tone === 'due' ? 'bg-rose-500 border-rose-500 shadow-lg'
+                : reminderLine.tone === 'done' ? 'bg-emerald-50 border-emerald-200'
+                : 'bg-white border-slate-100'}`}>
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl shrink-0">{reminderLine.tone === 'due' ? '🔔' : reminderLine.tone === 'done' ? '🎉' : '⏰'}</span>
+                  <p className={`flex-1 text-xl font-black leading-snug ${reminderLine.tone === 'due' ? 'text-white' : 'text-slate-800'}`}>
+                    {reminderLine.text}
+                  </p>
+                  {ttsSupported && (
+                    <button
+                      onClick={() => speak(reminderLine.text)}
+                      aria-label="朗读提醒"
+                      className={`shrink-0 w-14 h-14 rounded-2xl flex items-center justify-center text-2xl active:scale-90 transition-all ${reminderLine.tone === 'due' ? 'bg-white/25 text-white' : 'bg-rose-50 text-rose-500'}`}
+                    >
+                      🔊
+                    </button>
+                  )}
+                </div>
+                {reminderLine.tone === 'due' && reminderLine.med && (
+                  <button
+                    onClick={() => handleTakeMedication(reminderLine.med.id, reminderLine.slot)}
+                    className="mt-4 w-full py-5 rounded-2xl text-2xl font-black bg-white text-rose-600 shadow active:scale-95 transition-all"
+                  >
+                    我 吃 了
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Med list — big buttons */}
+            <div className="px-6 space-y-4 pb-6">
+              {medications.map(med => {
+                const takenSlots = med.takenSlots || (med.taken ? (med.times || []) : []);
+                const allDone = med.taken;
+                const someDone = !allDone && takenSlots.length > 0;
+                const cardBg = allDone
+                  ? 'bg-emerald-100/70 border-2 border-emerald-200'
+                  : someDone
+                  ? 'bg-amber-50 border-2 border-amber-200'
+                  : dueMedIds.has(String(med.id))
+                  ? 'bg-white border-2 border-rose-300 ring-4 ring-rose-200/60 shadow-lg'
+                  : 'bg-white border-2 border-rose-100 shadow-md';
+                return (
+                  <div key={med.id} className={`rounded-3xl p-5 ${cardBg}`}>
+                    <div className="flex items-center gap-4">
+                      <div className="w-14 h-14 rounded-2xl bg-white flex items-center justify-center text-3xl shadow-sm shrink-0">{med.icon}</div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-lg font-black ${allDone ? 'line-through text-emerald-700' : 'text-slate-800'}`}>{med.name}</p>
+                        <p className="text-sm font-bold text-slate-500 mt-0.5">{med.dose}</p>
+                      </div>
+                    </div>
+                    {(med.times || []).length > 1 ? (
+                      // 多剂次：每个时段各一个按钮，独立判定，不再因为早上吃了就藏掉晚上那剂
+                      <div className="mt-4 grid grid-cols-2 gap-3">
+                        {med.times.map(t => {
+                          const slotDone = takenSlots.includes(t);
+                          return (
+                            <button key={t}
+                              onClick={() => handleTakeMedication(med.id, t)}
+                              className={`py-4 rounded-2xl text-base font-black transition-all active:scale-95 ${slotDone ? 'bg-emerald-200 text-emerald-700' : 'clay-btn-primary text-white shadow-lg'}`}
+                            >
+                              {slotDone ? `✓ ${t} 已吃` : `${t} 我吃了`}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      // 单剂次：整个药一键确认
+                      <button
+                        onClick={() => handleTakeMedication(med.id)}
+                        className={`mt-4 w-full py-5 rounded-2xl text-xl font-black transition-all active:scale-95 ${allDone ? 'bg-emerald-200 text-emerald-700' : 'clay-btn-primary text-white shadow-lg'}`}
+                      >
+                        {allDone ? "✓ 已吃了" : "我 吃 了"}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+              {medications.length === 0 && (
+                <div className="bg-white rounded-3xl p-6 text-center border-2 border-rose-100">
+                  <p className="text-base font-bold text-slate-500">今天没有要吃的药~</p>
+                  <p className="text-xs text-slate-400 mt-2">如果是你家人没安排，请提醒他/她去配置</p>
+                </div>
+              )}
+            </div>
+
+            {/* Family notes */}
+            {recentNotes.length > 0 && (
+              <div className="mx-6 mb-6 rounded-3xl bg-rose-50/80 border-2 border-rose-100 p-5 space-y-3">
+                <p className="text-base font-black text-rose-600 flex items-center gap-2">
+                  <MessageSquare className="w-5 h-5" /> 今日家人留言
+                </p>
+                {recentNotes.map(n => (
+                  <div key={n.id} className="bg-white rounded-2xl p-3 shadow-sm">
+                    <p className="text-sm font-black text-rose-500 mb-1">{n.author}</p>
+                    <p className="text-base font-bold text-slate-700 leading-relaxed">{n.text}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Streak chip */}
+            <div className="mx-6 mb-6 rounded-3xl bg-amber-50/80 border-2 border-amber-100 p-5 text-center">
+              <p className="text-xs font-bold text-amber-700">已经坚持</p>
+              <p className="text-4xl font-black text-amber-600 mt-1">{streakDays} 天</p>
+              <p className="text-sm font-bold text-amber-700 mt-2">{selectedPet.name} 也一天天地胖起来啦~</p>
+            </div>
+
+            {/* 适老化：看不清 / 听不清就点这里（Task #6，本机记忆） */}
+            <div className="mx-6 mb-10 rounded-3xl bg-white border-2 border-slate-100 p-5 space-y-4">
+              <p className="text-base font-black text-slate-600 text-center">看不清？在这里调大字</p>
+              <div className="grid grid-cols-3 gap-3">
+                {[['normal','标准'],['large','大'],['huge','超大']].map(([val,label]) => (
+                  <button
+                    key={val}
+                    onClick={() => setA11y({ fontScale: val })}
+                    className={`min-h-[56px] rounded-2xl font-black transition-all active:scale-95 border-2 ${
+                      a11y.fontScale === val ? 'bg-rose-500 text-white border-rose-500 shadow' : 'bg-white text-slate-600 border-slate-200'}`}
+                    style={{ fontSize: val === 'huge' ? 22 : val === 'large' ? 19 : 16 }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {ttsSupported && (
+                <button
+                  onClick={() => { const next = !a11y.voiceOn; setA11y({ voiceOn: next }); if (next) window.setTimeout(() => { try { const u = new SpeechSynthesisUtterance("已开启语音朗读"); u.lang = "zh-CN"; window.speechSynthesis.speak(u); } catch {} }, 60); else { try { window.speechSynthesis.cancel(); } catch {} } }}
+                  className={`w-full min-h-[56px] rounded-2xl font-black text-lg transition-all active:scale-95 border-2 flex items-center justify-center gap-2 ${
+                    a11y.voiceOn ? 'bg-emerald-500 text-white border-emerald-500 shadow' : 'bg-white text-slate-500 border-slate-200'}`}
+                >
+                  {a11y.voiceOn ? '🔊 语音朗读：已开' : '🔇 语音朗读：已关'}
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      }
+
+      // -------- Admin view（原全功能视图） ----------
+      return (
+        <div className="w-full flex-grow flex flex-col items-center justify-start mobile-safe-shell">
+
+          {/* Toast Notification Container */}
+          {toastMsg && (
+            <div className="fixed top-8 left-1/2 -translate-x-1/2 z-50 clay-surface-soft bg-rose-50 border-rose-300 text-rose-700 font-bold px-6 py-3.5 flex items-center gap-2.5 animate-bounce shadow-xl text-sm max-w-[90%]">
+              <Sparkles className="w-5 h-5 text-rose-400 shrink-0" />
+              <span>{toastMsg}</span>
+            </div>
+          )}
+
+          {/* Root Shell layout responsive system */}
+          <div className="w-full max-w-[1280px] min-h-screen grid grid-cols-1 lg:grid-cols-12 gap-0 lg:gap-8 px-0 sm:px-4 lg:px-8 py-0 lg:py-6 relative">
+            
+            {/* Desktop Left-persistent Dynamic Navigation Sidebar */}
+            <aside className="hidden lg:col-span-3 lg:flex flex-col gap-6 h-fit sticky top-6">
+              <div className="clay-surface-soft p-6 flex flex-col gap-6">
+                
+                {/* Brand Identity */}
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-300 to-rose-400 p-0.5 shadow-md flex items-center justify-center text-white">
+                    <Heart className="w-6 h-6 fill-white" />
+                  </div>
+                  <div>
+                    <h1 className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-1.5">
+                      PillPal <span className="text-rose-400">药宝</span>
+                    </h1>
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mt-0.5">你的有爱服药主理人</p>
+                  </div>
+                </div>
+
+                {/* Profile card and Health Indexes status */}
+                <div className="clay-surface-sunken p-4 flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-500 font-bold">{selectedPet.name}的健康力</span>
+                    <span className="text-xs text-emerald-500 font-black">{selectedPet.healthIndex}%</span>
+                  </div>
+                  {/* Puffy Clay-style progress bar */}
+                  <div className="w-full h-4 bg-slate-200/60 rounded-full overflow-hidden p-0.5 shadow-inner">
+                    <div 
+                      className="h-full bg-gradient-to-r from-teal-400 to-emerald-400 rounded-full transition-all duration-500 shadow-sm"
+                      style={{ width: `${selectedPet.healthIndex}%` }}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between mt-1 text-xs text-slate-400 font-medium">
+                    <span>状态: <strong className="text-slate-600 font-bold">{selectedPet.status}</strong></span>
+                    <span>Lv.{selectedPet.level}</span>
+                  </div>
+                  {/* Exp Progress Bar */}
+                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-rose-400 rounded-full transition-all duration-300"
+                      style={{ width: `${(selectedPet.points / selectedPet.targetPoints) * 100}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Navigation menu list */}
+                <nav className="flex flex-col gap-2.5">
+                  <button 
+                    onClick={() => setCurrentTab('home')}
+                    className={`w-full px-4 py-3.5 rounded-2xl font-bold flex items-center justify-between transition-all ${currentTab === 'home' ? 'clay-btn-primary text-white' : 'text-slate-500 hover:bg-slate-50'}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Home className="w-5 h-5" />
+                      <span>伴侣庄园 (主屏)</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 opacity-75" />
+                  </button>
+
+                  <button 
+                    onClick={() => setCurrentTab('medication')}
+                    className={`w-full px-4 py-3.5 rounded-2xl font-bold flex items-center justify-between transition-all ${currentTab === 'medication' ? 'clay-btn-primary text-white' : 'text-slate-500 hover:bg-slate-50'}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Pill className="w-5 h-5" />
+                      <span>安排我的药片</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 opacity-75" />
+                  </button>
+
+                  <button 
+                    onClick={() => setCurrentTab('doctor')}
+                    className={`w-full px-4 py-3.5 rounded-2xl font-bold flex items-center justify-between transition-all ${currentTab === 'doctor' ? 'clay-btn-primary text-white' : 'text-slate-500 hover:bg-slate-50'}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <ClipboardCheck className="w-5 h-5" />
+                      <span>复诊与重要医嘱</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 opacity-75" />
+                  </button>
+
+                  <button
+                    onClick={() => setCurrentTab('family')}
+                    className={`w-full px-4 py-3.5 rounded-2xl font-bold flex items-center justify-between transition-all ${currentTab === 'family' ? 'clay-btn-primary text-white' : 'text-slate-500 hover:bg-slate-50'}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Users className="w-5 h-5" />
+                      <span>照护者视窗</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 opacity-75" />
+                  </button>
+
+                  <button
+                    onClick={() => setCurrentTab('settings')}
+                    className={`w-full px-4 py-3.5 rounded-2xl font-bold flex items-center justify-between transition-all ${currentTab === 'settings' ? 'clay-btn-primary text-white' : 'text-slate-500 hover:bg-slate-50'}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Settings className="w-5 h-5" />
+                      <span>家庭配置</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 opacity-75" />
+                  </button>
+                </nav>
+
+                {/* Left quick helper info */}
+                <div className="bg-orange-50/50 rounded-2xl p-4 border border-orange-100 flex items-start gap-3">
+                  <span className="text-xl">💡</span>
+                  <div className="text-xs text-amber-800 space-y-1">
+                    <p className="font-bold">今日提示</p>
+                    <p className="leading-relaxed font-medium">{selectedPet.name}提醒：每喂饱一次（吃一次药），它就会增加25点成长值哦！</p>
+                  </div>
+                </div>
+
+              </div>
+            </aside>
+
+
+            {/* Main Center Pet Canvas Interactive Frame */}
+            <main className={`lg:col-span-6 ${isCompactMobileStage ? 'hidden lg:flex' : 'flex'} flex-col w-full h-auto lg:h-[calc(100vh-48px)] overflow-hidden rounded-[2.5rem] relative p-4 pt-[18px] pb-[24px] lg:p-6 lg:bg-transparent ${isCompactMobileStage ? 'min-h-[300px]' : 'min-h-[540px]'}`}>
+              
+              {/* Main content wrapper containing 3D Renderer container */}
+              <div className={`w-full h-full relative flex flex-col justify-between z-10 ${isCompactMobileStage ? 'gap-2' : ''}`}>
+                
+                {/* Header Profile for Mobile layout adapts */}
+                <header className="flex items-center justify-between lg:hidden w-full px-2 mb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-10 h-10 rounded-xl bg-orange-200 flex items-center justify-center text-gradient-br text-base font-bold">
+                      {selectedPetMeta.emoji}
+                    </div>
+                    <div>
+                      <h2 className="text-base font-black text-slate-800">药宝 • {selectedPet.name}</h2>
+                      <p className="text-xs text-slate-400 font-semibold tracking-wider uppercase">Lv.{selectedPet.level} • {selectedPet.type} • 连续{streakDays}天</p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                    className="clay-btn-secondary w-11 h-11 flex items-center justify-center text-slate-600"
+                    aria-label="打开菜单"
+                  >
+                    {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+                  </button>
+                </header>
+
+                {mobileMenuOpen && currentTab === 'home' && (
+                  <div className="lg:hidden grid grid-cols-3 gap-2 px-2 mb-3">
+                    {[
+                      ['home', '主页', Home], ['medication', '我的药物', Pill], ['doctor', '医嘱记录', ClipboardCheck], ['family', '家属视角', Users], ['settings', '家庭配置', Settings]
+                    ].map(([tab, label, Icon]) => (
+                      <button key={tab} onClick={() => { setCurrentTab(tab); setMobileMenuOpen(false); }} className={`rounded-2xl py-3 px-3 text-xs font-black flex items-center justify-center gap-2 ${currentTab === tab ? 'clay-btn-primary' : 'clay-btn-secondary text-slate-600'}`}>
+                        <Icon className="w-4 h-4" />{label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Pet selection and status strip */}
+                <div className={`grid ${isChangingPet ? 'grid-cols-3 sm:grid-cols-6' : 'grid-cols-1'} gap-2 px-1 mb-3`}>
+                  {visiblePets.map(pet => (
+                    <button
+                      key={pet.id}
+                      onClick={() => selectPet(pet)}
+                      className={`rounded-2xl p-2 bg-gradient-to-br ${pet.color} border transition-all ${pet.selected ? 'border-rose-300 scale-[1.03] shadow-lg' : 'border-white/60 opacity-80'} flex ${isChangingPet ? 'flex-col' : 'flex-row justify-between'} items-center gap-2`}
+                    >
+                      <span className={`text-2xl ${pet.state === 'float' ? 'pet-float' : pet.state === 'sick' ? 'pet-sick' : 'pet-sleeping'}`}>{pet.emoji}</span>
+                      <span className="text-xs font-black text-slate-600 leading-none">{pet.name}</span>
+                      {!isChangingPet && (
+                        <span
+                          onClick={(e) => { e.stopPropagation(); setIsChangingPet(true); }}
+                          className="text-xs font-black text-rose-500 bg-white/70 px-2.5 py-1 rounded-full"
+                        >更换动物</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+
+                {isChangingPet && (
+                  <button onClick={() => setIsChangingPet(false)} className="lg:hidden -mt-1 mb-2 mx-1 py-2 rounded-2xl bg-white/70 text-xs font-black text-slate-500 border border-white/70">
+                    收起动物选择
+                  </button>
+                )}
+
+                <div className="grid grid-cols-3 gap-2 px-1 mb-3">
+                  <div className="clay-surface-sunken p-3 text-center">
+                    <p className="text-xs text-slate-400 font-bold">健康值</p>
+                    <p className="text-base font-black text-emerald-500">{selectedPet.healthIndex}%</p>
+                  </div>
+                  <div className="clay-surface-sunken p-3 text-center">
+                    <p className="text-xs text-slate-400 font-bold">宠物状态</p>
+                    <p className="text-sm font-black text-slate-700">{selectedPet.status}</p>
+                  </div>
+                  <div className="clay-surface-sunken p-3 text-center">
+                    <p className="text-xs text-slate-400 font-bold">上次喂食</p>
+                    <p className="text-xs font-black text-rose-500">{lastFeedLabel}</p>
+                  </div>
+                </div>
+
+                {/* 3D clay stage component container */}
+                <div className={`w-full flex-grow relative rounded-[2rem] bg-gradient-to-b from-sky-50/20 via-pink-50/10 to-indigo-50/20 overflow-hidden ${isCompactMobileStage ? 'min-h-[170px] max-h-[210px] lg:min-h-[300px] lg:max-h-none' : 'min-h-[300px]'}`}>
+                  
+                  {/* ThreeJS Interactive viewport */}
+                  <ClayPet3D
+                    petId={selectedPet.id}
+                    petState={petVisualState}
+                    bubbleText={bubbleText}
+                    onPetClick={handlePetClick}
+                  />
+
+                  {/* Absolute positioning background decors */}
+                  <div className="absolute top-4 right-4 w-12 h-12 bg-indigo-200/20 rounded-full blur-xl pointer-events-none" />
+                  <div className="absolute bottom-20 left-4 w-16 h-16 bg-rose-200/20 rounded-full blur-2xl pointer-events-none" />
+                </div>
+
+                {/* Quick actions row at the bottom of the stage */}
+                <div className={`w-full justify-center gap-3 px-2 pt-4 ${isCompactMobileStage ? 'hidden lg:flex' : 'flex'}`}>
+                  <button 
+                    onClick={handlePetClick}
+                    className="clay-btn-secondary flex-1 py-3 px-4 flex items-center justify-center gap-2 text-slate-700 font-bold active:scale-95 text-sm md:text-base"
+                  >
+                    <Smile className="w-5 h-5 text-rose-400" />
+                    <span>摸摸{selectedPet.name}</span>
+                  </button>
+
+                  <button 
+                    onClick={feedFamilyReminder}
+                    className="clay-btn-secondary flex-1 py-3 px-4 flex items-center justify-center gap-2 text-slate-700 font-bold active:scale-95 text-sm md:text-base"
+                  >
+                    <HeartHandshake className="w-5 h-5 text-sky-400" />
+                    <span>倒杯温水</span>
+                  </button>
+                </div>
+
+              </div>
+
+              <div className="absolute inset-x-0 top-16 z-0 pointer-events-none lg:hidden">
+                <div className="mx-auto w-[82%] h-28 rounded-full bg-gradient-to-r from-rose-100/40 via-sky-100/30 to-amber-100/30 blur-3xl" />
+              </div>
+
+              {/* Decorative dynamic background mesh simulating clay space */}
+              <div className="absolute inset-0 bg-white/50 backdrop-blur-md rounded-[2.5rem] shadow-xl border border-white/40 -z-20 pointer-events-none" />
+
+            </main>
+
+
+            {/* Right details content deck (Cards & Lists depending on selected state) */}
+            <section className="lg:col-span-3 flex flex-col gap-6 overflow-y-auto pr-0 lg:pr-2 pb-[110px] lg:pb-0 h-fit lg:max-h-[calc(100vh-48px)] mobile-card-scroll px-4 pt-4 lg:px-0 lg:pt-0">
+
+              {/* 角色徽标：一眼区分这是子女（家人）管理端 */}
+              <div className="flex items-center justify-center lg:justify-start">
+                <span className="inline-flex items-center gap-1.5 text-xs font-black bg-rose-50 text-rose-500 px-3 py-1.5 rounded-full border border-rose-100">
+                  👨‍👩‍👧 家人管理端
+                </span>
+              </div>
+
+              <div className="clay-surface-soft p-3 lg:p-0 items-center justify-between lg:hidden hidden">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-orange-200 to-rose-200 flex items-center justify-center text-base shadow-sm">
+                    {selectedPetMeta.emoji}
+                  </div>
+                  <div>
+                    <p className="text-sm font-black text-slate-800">{currentTab === 'medication' ? '我的药物' : currentTab === 'doctor' ? '医嘱日记' : '加点爱'}</p>
+                    <p className="text-xs text-slate-400 font-bold">{selectedPet.name} · 健康值 {selectedPet.healthIndex}%</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                  className="clay-btn-secondary w-10 h-10 flex items-center justify-center text-slate-600"
+                  aria-label="打开菜单"
+                >
+                  {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+                </button>
+              </div>
+
+              {mobileMenuOpen && currentTab === 'home' && (
+                <div className="lg:hidden grid grid-cols-3 gap-2">
+                  {[
+                    ['home', '主页', Home], ['medication', '我的药物', Pill], ['doctor', '医嘱记录', ClipboardCheck], ['family', '家属视角', Users], ['settings', '家庭配置', Settings]
+                  ].map(([tab, label, Icon]) => (
+                    <button key={tab} onClick={() => { setCurrentTab(tab); setMobileMenuOpen(false); }} className={`rounded-2xl py-3 px-3 text-xs font-black flex items-center justify-center gap-2 ${currentTab === tab ? 'clay-btn-primary' : 'clay-btn-secondary text-slate-600'}`}>
+                      <Icon className="w-4 h-4" />{label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Dynamic Screen panel header rendering relative content templates based on screen tabs */}
+              <div className="clay-surface-soft p-5 lg:p-6 flex flex-col gap-5">
+
+                {/* Header indicators */}
+                {currentTab === 'home' && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs bg-rose-100 text-rose-500 font-bold px-3 py-1 rounded-full flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" /> 今日服药反馈步道
+                    </span>
+                    <span className="text-xs text-slate-400 font-semibold">
+                      {medications.filter(m => m.taken).length}/{medications.length} 已喂食
+                    </span>
+                  </div>
+                )}
+
+                {/* 到点提醒条（F2.2）—— 家人端可代记或一键提醒妈妈 */}
+                {currentTab === 'home' && reminderLine && (
+                  <div className={`rounded-2xl p-4 border flex items-center justify-between gap-3 ${
+                    reminderLine.tone === 'due' ? 'bg-rose-50 border-rose-200'
+                    : reminderLine.tone === 'done' ? 'bg-emerald-50 border-emerald-100'
+                    : 'bg-slate-50 border-slate-100'}`}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-xl shrink-0">{reminderLine.tone === 'due' ? '🔔' : reminderLine.tone === 'done' ? '🎉' : '⏰'}</span>
+                      <p className="text-sm font-black text-slate-700 truncate">{reminderLine.text}</p>
+                    </div>
+                    {reminderLine.tone === 'due' && reminderLine.med && (
+                      <div className="flex gap-2 shrink-0">
+                        <button onClick={() => handleTakeMedication(reminderLine.med.id, reminderLine.slot)} className="clay-btn-primary px-3 py-2 text-xs font-black text-white whitespace-nowrap">代记已吃</button>
+                        <button onClick={() => sendAdminNote(`记得吃「${reminderLine.med.name}」哦，我在陪着你 💛`, adminNoteAuthor)} className="clay-btn-secondary px-3 py-2 text-xs font-black text-rose-500 whitespace-nowrap">提醒{elderCall}</button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* F11.4 健康关心卡：老人语音陪伴时被静默记录的信号，在这里温柔转达给家人。
+                    只描述"提到了什么"，不做任何判断——把关心递到、把决定权留给家人和医生。 */}
+                {currentTab === 'home' && healthCare.length > 0 && (
+                  <div className="rounded-2xl p-4 bg-amber-50 border border-amber-100 flex flex-col gap-3">
+                    <div className="flex items-center gap-2">
+                      <Heart className="w-4 h-4 text-amber-500" />
+                      <span className="text-sm font-black text-amber-700">最近的悄悄话</span>
+                      <span className="text-[11px] text-amber-400 font-semibold ml-auto">近 14 天 · 仅供关心</span>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      {healthCare.map((s, i) => (
+                        <div key={i} className="flex items-center gap-3 bg-white/70 rounded-xl px-3 py-2">
+                          <span className="text-lg shrink-0">{signalEmoji(s.kind)}</span>
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold text-slate-700 truncate">{elderCall}{signalLabel(s.kind)}</p>
+                            {s.local_date && <p className="text-[11px] text-slate-400 font-semibold">{String(s.local_date).slice(5)}</p>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-amber-500/80 leading-relaxed">
+                      这些只是{elderCall}聊天时随口提到的话，药宝帮你记下来了。要不要打个电话问问？💛
+                      <br />非医疗判断，身体不适请及时就医。
+                    </p>
+                  </div>
+                )}
+
+                {/* Render Home Screen Details - Today's Feeding Dose tasks list */}
+                {currentTab === 'home' && (
+                  <div className="flex flex-col gap-4">
+                    <h3 className="text-base font-black text-slate-800">🏥 今日药丸喂食清单</h3>
+                    
+                    {/* List */}
+                    <div className="flex flex-col gap-3">
+                      {medications.map(med => (
+                        <div 
+                          key={med.id} 
+                          className={`relative flex items-center justify-between p-4 rounded-2xl transition-all duration-300 ${med.taken ? 'bg-emerald-50/50 border border-emerald-100' : 'clay-surface-sunken'}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-xl shadow-sm border border-slate-100">
+                              {med.icon}
+                            </div>
+                            <div>
+                              <p className={`font-bold text-sm ${med.taken ? 'line-through text-slate-400' : 'text-slate-800'}`}>
+                                {med.name}
+                              </p>
+                              <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1 flex-wrap">
+                                <Clock className="w-3 h-3" /> {med.times.join(' / ')} ({med.dose})
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Take Medicine action toggle button */}
+                          <button
+                            onClick={() => handleTakeMedication(med.id)}
+                            className={`p-2.5 rounded-xl transition-all duration-150 ${med.taken ? 'bg-emerald-100 text-emerald-600' : 'clay-btn-primary'}`}
+                            title={med.taken ? "取消记录" : "确认已吃药"}
+                          >
+                            {med.taken ? (
+                              <CheckCircle2 className="w-5 h-5 stroke-[2.5]" />
+                            ) : (
+                              <ArrowRight className="w-5 h-5 font-bold" />
+                            )}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <button
+                      onClick={() => setCurrentTab('medication')}
+                      className="mt-2 w-full py-3.5 bg-gradient-to-r from-teal-50 to-emerald-50 border border-emerald-100/50 rounded-2xl text-xs font-black text-emerald-600 flex items-center justify-center gap-2 hover:brightness-95 transition-all"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>添加新药物提醒计划</span>
+                    </button>
+
+                    <div className="rounded-2xl bg-gradient-to-r from-amber-50 to-rose-50 border border-amber-100 p-4 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-black text-amber-700 flex items-center gap-1"><Trophy className="w-4 h-4" /> 连续打卡</p>
+                        <p className="text-xl font-black text-slate-800 mt-1">{streakDays} 天</p>
+                        <p className="text-xs text-slate-500 font-semibold">达到 7 / 14 / 30 天会生成社区分享成就卡</p>
+                      </div>
+                      <button onClick={() => setAchievementShare({ days: streakDays, pet: selectedPet.name })} className="clay-btn-secondary px-3 py-2 text-xs font-black text-rose-500 flex items-center gap-1">
+                        <Share2 className="w-4 h-4" /> 分享
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Render Medication management screen */}
+                {currentTab === 'medication' && (
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-base font-black text-slate-800">💊 药物管理规划</h3>
+                      <button 
+                        onClick={() => setShowNewMedModal(!showNewMedModal)}
+                        className="text-rose-500 hover:text-rose-600 text-xs font-bold flex items-center gap-1.5"
+                      >
+                        {showNewMedModal ? "取消" : "新增 +"}
+                      </button>
+                    </div>
+
+                    {showNewMedModal ? (
+                      /* Add pill form interactive */
+                      <form onSubmit={addNewMedication} className="flex flex-col gap-4 animate-fade-in duration-200">
+                        {/* F11.2 药盒拍照识别 —— 安全边界：结果必须人工确认才落库 */}
+                        <div className="clay-surface-sunken p-3 rounded-2xl space-y-2">
+                          <p className="text-xs font-black text-slate-600 flex items-center gap-1">📷 拍药盒自动识别（可选）</p>
+                          {/* F11.6 医疗免责：AI 只做录入辅助，用法用量一律以医嘱/说明书为准 */}
+                          <p className="text-xs text-slate-400 font-bold leading-relaxed">
+                            AI 识别结果，请核对药盒后确认，不会自动生效。<br />
+                            AI 不能替代医生，用法用量请以医嘱和药品说明书为准。
+                          </p>
+                          <label className={`flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border-2 border-dashed cursor-pointer transition-all ${visionBusy ? 'border-slate-200 text-slate-400' : 'border-rose-200 text-rose-500 hover:bg-rose-50'}`}>
+                            <input type="file" accept="image/*" capture="environment" className="hidden"
+                              disabled={visionBusy}
+                              onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) handleVisionScan(f); e.target.value = ""; }} />
+                            <span className="text-sm font-black">{visionBusy ? '识别中…' : '📸 拍照 / 选图'}</span>
+                          </label>
+                          {visionDraft && visionDraft.length > 0 && (
+                            <div className="space-y-1.5">
+                              <p className="text-xs font-black text-emerald-600">识别到 {visionDraft.length} 种药，点击填入草稿：</p>
+                              {visionDraft.map((m, i) => (
+                                <button key={i} type="button" onClick={() => applyVisionDraft(m)}
+                                  className="w-full text-left px-3 py-2 bg-white rounded-xl border border-emerald-200 text-xs font-bold text-slate-700 hover:bg-emerald-50 active:scale-95 transition-all">
+                                  <span className="font-black text-slate-800">{m.name || '（未识别）'}</span>
+                                  {m.dose ? ` · ${m.dose}` : ''}{m.times && m.times.length ? ` · ${m.times.join('/')}` : ''}
+                                  {m.notes ? <span className="block text-slate-400 mt-0.5">{m.notes}</span> : null}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-slate-500">药品名称</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="如：倍他乐克（降压）"
+                            value={newMedName}
+                            onChange={(e) => setNewMedName(e.target.value)}
+                            className="w-full px-4 py-3 clay-input-soft text-slate-800 font-bold placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-200 text-sm"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-slate-500">剂量与频次说明</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="如：一次2片，餐后服用"
+                            value={newMedDose}
+                            onChange={(e) => setNewMedDose(e.target.value)}
+                            className="w-full px-4 py-3 clay-input-soft text-slate-800 font-bold placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-200 text-sm"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <label className="text-xs font-bold text-slate-500">多个提醒时间</label>
+                            <button type="button" onClick={addMedTimeField} className="text-xs font-black text-emerald-500 flex items-center gap-1"><Plus className="w-3 h-3" />加时间</button>
+                          </div>
+                          {newMedTimes.map((time, index) => (
+                            <div key={index} className="flex items-center gap-2">
+                              <input
+                                type="time"
+                                required
+                                value={time}
+                                onChange={(e) => updateMedTime(index, e.target.value)}
+                                className="w-full px-4 py-3 clay-input-soft text-slate-800 font-bold focus:outline-none focus:ring-2 focus:ring-rose-200 text-sm"
+                              />
+                              {newMedTimes.length > 1 && (
+                                <button type="button" onClick={() => removeMedTimeField(index)} className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-400 flex items-center justify-center">
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+
+                        <button
+                          type="submit"
+                          className="w-full py-3.5 clay-btn-primary font-bold text-sm"
+                        >
+                          🎉 确认派发守护任务
+                        </button>
+                      </form>
+                    ) : (
+                      /* General show lists with deletion */
+                      <div className="flex flex-col gap-3">
+                        {medications.map(med => (
+                          <div key={med.id} className="clay-surface-sunken p-4 relative flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <span className="text-2xl shrink-0">{med.icon}</span>
+                              <div className="min-w-0">
+                                <h4 className="font-bold text-slate-800 text-sm truncate">{med.name}</h4>
+                                <p className="text-xs text-slate-400 mt-0.5">{med.dose}</p>
+                                <div className="flex flex-wrap gap-1.5 mt-2">
+                                  {med.times.map(time => <span key={time} className="text-xs text-rose-400 font-black px-2 py-1 bg-rose-50 rounded-lg">{time}</span>)}
+                                </div>
+                              </div>
+                            </div>
+                            <button onClick={() => deleteMedication(med.id)} className="w-9 h-9 rounded-2xl bg-white/70 text-slate-400 hover:text-rose-500 flex items-center justify-center shrink-0" title="删除药物">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Render Doctors Advice memo screen */}
+                {currentTab === 'doctor' && (
+                  <div className="flex flex-col gap-4">
+                    <h3 className="text-base font-black text-slate-800">📋 医嘱记录与复诊提醒</h3>
+                    <form onSubmit={addMedicalLog} className="clay-surface-sunken p-4 space-y-3">
+                      {/* F11.3 医嘱语音速记 —— 说一段，AI 转文字填入内容框 */}
+                      <div className="flex gap-2 items-center">
+                        <button type="button"
+                          onMouseDown={(e) => { e.preventDefault(); startMedDictation(); }}
+                          onMouseUp={(e) => { e.preventDefault(); stopMedDictation(); }}
+                          onMouseLeave={() => { if (medTalkingRef.current) stopMedDictation(); }}
+                          onTouchStart={(e) => { e.preventDefault(); startMedDictation(); }}
+                          onTouchEnd={(e) => { e.preventDefault(); stopMedDictation(); }}
+                          disabled={medRecState === 'thinking'}
+                          style={{ touchAction: 'none' }}
+                          className={`flex-1 py-2.5 rounded-xl text-xs font-black transition-all active:scale-95 border select-none ${
+                            medRecState === 'recording' ? 'bg-rose-500 text-white border-rose-500 animate-pulse'
+                            : medRecState === 'thinking' ? 'bg-slate-200 text-slate-500 border-slate-200'
+                            : 'bg-white text-rose-500 border-rose-200'}`}
+                        >
+                          {medRecState === 'recording' ? '🎙️ 松开停止' : medRecState === 'thinking' ? '转文字中…' : '🎤 按住语音速记医嘱'}
+                        </button>
+                      </div>
+                      {/* F11.6 医疗免责：转写只是录入辅助，内容需人工核对，不构成医疗建议 */}
+                      <p className="text-xs text-slate-400 font-bold leading-relaxed">
+                        语音转文字仅为录入辅助，请核对后保存。AI 不能替代医生，一切用药请遵医嘱。
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input value={newLog.hospital} onChange={(e) => setNewLog({ ...newLog, hospital: e.target.value })} placeholder="就诊医院" className="px-3 py-2 clay-input-soft text-xs font-bold focus:outline-none" />
+                        <input value={newLog.doctor} onChange={(e) => setNewLog({ ...newLog, doctor: e.target.value })} placeholder="医生姓名" className="px-3 py-2 clay-input-soft text-xs font-bold focus:outline-none" />
+                      </div>
+                      <input value={newLog.followDate} onChange={(e) => setNewLog({ ...newLog, followDate: e.target.value })} placeholder="复诊日期：如 2026-06-18" className="w-full px-3 py-2 clay-input-soft text-xs font-bold focus:outline-none" />
+                      <textarea value={newLog.content} onChange={(e) => setNewLog({ ...newLog, content: e.target.value })} placeholder="医生叮嘱：用药注意、饮食禁忌、观察指标..." className="w-full px-3 py-2 clay-input-soft text-xs font-bold focus:outline-none min-h-[70px] resize-none" />
+                      <button type="submit" className="w-full py-2.5 clay-btn-primary text-xs font-black">保存医嘱记录</button>
+                    </form>
+
+                    <div className="flex flex-col gap-3">
+                      {medicalLogs.map(log => {
+                        const opened = expandedLogId === log.id;
+                        return (
+                          <div key={log.id} className="bg-amber-50/50 border border-amber-100 rounded-2xl p-4 flex flex-col gap-2">
+                            <button onClick={() => setExpandedLogId(opened ? null : log.id)} className="flex items-center justify-between gap-2 text-left">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <Stethoscope className="w-4 h-4 text-amber-500 shrink-0" />
+                                <div className="min-w-0">
+                                  <span className="text-xs font-black text-amber-800 block truncate">{log.doctor} · {log.hospital}</span>
+                                  <span className="text-xs text-amber-700/70 font-semibold">复诊：{log.followDate}</span>
+                                </div>
+                              </div>
+                              <ChevronDown className={`w-4 h-4 text-amber-500 transition-transform ${opened ? 'rotate-180' : ''}`} />
+                            </button>
+                            {opened && (
+                              <div className="pt-2 border-t border-amber-100/60 space-y-2">
+                                <p className="text-xs text-slate-600 leading-relaxed font-bold">{log.content}</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {log.tags.map(tag => <span key={tag} className="text-xs bg-amber-400 text-white font-extrabold px-2 py-0.5 rounded-full">{tag}</span>)}
+                                </div>
+                                <p className="text-xs text-slate-400 font-semibold">就诊日期：{log.visitDate}</p>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Render Family surveillance dashboard */}
+                {currentTab === 'family' && (
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-base font-black text-slate-800">👨‍👩‍👧‍👦 家属实时观察窗</h3>
+                      <span className={`text-xs font-black px-2 py-1 rounded-full ${cloudStatus === 'synced' ? 'bg-emerald-50 text-emerald-500' : cloudStatus === 'error' ? 'bg-rose-50 text-rose-500' : 'bg-slate-100 text-slate-500'}`}>
+                        {cloudStatus === 'synced' ? '☁ 已同步' : cloudStatus === 'error' ? '⚠ 未同步' : '⌛ 同步中'}
+                      </span>
+                    </div>
+
+                    <div className="clay-surface-sunken p-4 rounded-2xl space-y-4">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-white/70 rounded-2xl p-3 text-center border border-white/70">
+                          <p className="text-xs text-slate-400 font-bold">远程健康值</p>
+                          <p className="text-2xl font-black text-emerald-500">{selectedPet.healthIndex}%</p>
+                        </div>
+                        <div className="bg-white/70 rounded-2xl p-3 text-center border border-white/70">
+                          <p className="text-xs text-slate-400 font-bold">连续打卡</p>
+                          <p className="text-2xl font-black text-rose-500">{streakDays}天</p>
+                        </div>
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-black text-slate-700 mb-2 flex items-center gap-1"><Activity className="w-4 h-4 text-teal-400" /> 本周服药历史</p>
+                        <div className="grid grid-cols-7 gap-1.5 items-end h-20">
+                          {weeklyHistory.map(item => (
+                            <div key={item.day} className="flex flex-col items-center gap-1">
+                              <div className="w-full max-w-[18px] h-12 rounded-full bg-slate-200/70 overflow-hidden flex items-end shadow-inner">
+                                <div className="w-full bg-gradient-to-t from-teal-400 to-emerald-300 rounded-full transition-all" style={{ height: `${(item.done / item.total) * 100}%` }} />
+                              </div>
+                              <span className="text-xs text-slate-400 font-bold">{item.day}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Family members brief view — 真接 familyMembers */}
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex -space-x-2.5">
+                          {familyMembers.slice(0, 5).map((m, i) => (
+                            <div key={m.id || i} className="w-8 h-8 rounded-full bg-gradient-to-br from-rose-100 to-sky-100 border-2 border-white flex items-center justify-center text-xs">
+                              {m.avatar || "👤"}
+                            </div>
+                          ))}
+                          {familyMembers.length === 0 && (
+                            <div className="w-8 h-8 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-xs text-slate-400">+</div>
+                          )}
+                        </div>
+                        <div className="text-xs">
+                          <p className="font-bold text-slate-700">{familyMembers.length} 位家属已加入伴侣关照</p>
+                          <p className="text-slate-400 text-xs">
+                            {familyMembers.length > 0
+                              ? familyMembers.map(m => m.name).join("、") + " 实时在线 · 留言板同步"
+                              : "去【家庭配置】添加第一位家人"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="h-px bg-slate-200/50" />
+
+                      {/* Admin → mom 留言输入（仅 admin 模式） */}
+                      {viewMode === 'admin' && (
+                        <form onSubmit={(e) => { e.preventDefault(); sendAdminNote(adminNoteText, adminNoteAuthor).then(ok => { if (ok !== false) setAdminNoteText(""); }); }} className="space-y-2">
+                          <p className="text-xs font-black text-slate-700 flex items-center gap-1">
+                            <MessageSquare className="w-3.5 h-3.5 text-rose-400" /> 给{elderCall}写一句话
+                          </p>
+                          {/* 侧栏只有约 380px 宽，三个控件挤一行会把输入框压成一条缝 —— 分行铺开 */}
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-slate-400 shrink-0">以谁的名义</span>
+                              <select
+                                value={adminNoteAuthor}
+                                onChange={e => setAdminNoteAuthor(e.target.value)}
+                                className="flex-1 min-w-0 px-2 py-2 clay-input-soft text-xs font-bold focus:outline-none"
+                              >
+                                <option value="家人">家人</option>
+                                {familyMembers.map(m => (
+                                  <option key={m.id} value={`${m.relation || ""}${m.name}`}>{m.relation}{m.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <input
+                              type="text"
+                              maxLength={120}
+                              value={adminNoteText}
+                              onChange={e => setAdminNoteText(e.target.value)}
+                              placeholder="今天的天气真好，记得吃药呀~"
+                              className="w-full px-3 py-2.5 clay-input-soft text-xs font-bold focus:outline-none"
+                            />
+                            <button type="submit" className="w-full clay-btn-primary py-2.5 text-xs font-black">💌 送达</button>
+                          </div>
+                          {familyId !== DEMO_FAMILY_ID && !adminPin && (
+                            <p className="text-xs text-rose-500 font-bold">还没有创建家庭，无法上云。先去【家庭配置】创建。</p>
+                          )}
+                        </form>
+                      )}
+
+                      {/* Events feed — 真实事件流（admin_note + mom_take） */}
+                      <div className="space-y-3.5">
+                        {events.length === 0 && familyFeed.length > 0 && familyFeed.map(feed => (
+                          <div key={"legacy-"+feed.id} className="relative pl-4 border-l-2 border-slate-200 flex flex-col gap-0.5 opacity-60">
+                            <p className="text-xs text-slate-500 font-black">{feed.author} · 旧种子</p>
+                            <p className="text-xs text-slate-600 font-bold leading-relaxed">{feed.text}</p>
+                            <span className="text-xs text-slate-400 mt-0.5">{feed.time}</span>
+                          </div>
+                        ))}
+                        {events.length === 0 && familyFeed.length === 0 && (
+                          <p className="text-xs text-slate-400 font-bold text-center py-3">还没有家人留言，也还没人确认服药~</p>
+                        )}
+                        {events.slice(0, 30).map(evt => {
+                          const isNote = evt.type === 'admin_note';
+                          const borderColor = isNote ? 'border-rose-300' : evt.taken ? 'border-emerald-300' : 'border-amber-300';
+                          const labelColor = isNote ? 'text-rose-500' : evt.taken ? 'text-emerald-600' : 'text-amber-600';
+                          const text = isNote
+                            ? evt.text
+                            : (evt.taken
+                                ? `确认服下：${evt.medName || '某药'}`
+                                : `撤销：${evt.medName || '某药'}`);
+                          const t = (() => { try { return new Date(evt.at).toLocaleString('zh-CN', { hour12: false }); } catch { return ""; } })();
+                          return (
+                            <div key={evt.id} className={`relative pl-4 border-l-2 ${borderColor} flex flex-col gap-0.5`}>
+                              <p className={`text-xs ${labelColor} font-black`}>{evt.author || "—"}</p>
+                              <p className="text-xs text-slate-600 font-bold leading-relaxed">{text}</p>
+                              <span className="text-xs text-slate-400 mt-0.5">{t}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                    </div>
+
+                    <div className="bg-sky-50 rounded-2xl p-4 border border-sky-100 flex items-start gap-3">
+                      <span className="text-lg">📢</span>
+                      <p className="text-xs text-sky-800 leading-relaxed font-bold">
+                        家属只要绑定了 PillPal，即可远程观察{selectedPet.name}是否干蔫、生病，从此不需打电话生硬质问，爱在指尖传递。
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Render Family settings (admin only) */}
+                {currentTab === 'settings' && viewMode === 'admin' && (
+                  <div className="flex flex-col gap-4">
+                    <h3 className="text-base font-black text-slate-800">⚙️ 家庭配置 · 给{elderCall}准备好</h3>
+
+                    {/* Family identity */}
+                    <div className="clay-surface-sunken p-4 rounded-2xl space-y-3">
+                      <p className="text-xs font-black text-slate-700">当前家庭码</p>
+                      <div className="flex gap-2 items-center">
+                        <code className="flex-1 px-3 py-2 bg-white rounded-xl text-sm font-black text-rose-500 tracking-widest border border-slate-100">{familyId}</code>
+                        <button onClick={() => { try { navigator.clipboard.writeText(familyId); showToast("已复制家庭码"); } catch { showToast("复制失败"); } }} className="clay-btn-secondary px-3 py-2 text-xs font-black">复制</button>
+                      </div>
+                      {familyId === DEMO_FAMILY_ID && (
+                        <p className="text-xs text-amber-600 font-bold">当前是演示家庭，所有人都能写。要给妈妈独立空间，请创建专属家庭 ↓</p>
+                      )}
+                      {familyId === DEMO_FAMILY_ID && (
+                        <button onClick={() => setCreateFamilyOpen(true)} className="w-full py-2.5 clay-btn-primary text-xs font-black">为{elderCall}创建专属家庭</button>
+                      )}
+                    </div>
+
+                    {/* 关注对象的称呼 —— 药宝不假设只服务「妈妈」 */}
+                    <div className="clay-surface-sunken p-4 rounded-2xl space-y-2">
+                      <p className="text-xs font-black text-slate-700 flex items-center gap-1">💛 关注谁</p>
+                      <input
+                        type="text"
+                        maxLength={12}
+                        value={elderName}
+                        onChange={(e) => setElderName(e.target.value)}
+                        placeholder="妈妈"
+                        className="w-full px-3 py-2.5 clay-input-soft text-sm font-bold focus:outline-none focus:ring-2 focus:ring-rose-200"
+                      />
+                      <p className="text-xs text-slate-400 font-bold leading-relaxed">
+                        爸爸、奶奶、老伴、张阿姨都可以。这个称呼会用在提醒、留言和通知里。留空默认「妈妈」。
+                      </p>
+                    </div>
+
+                    {/* 到点服药提醒通知（F2.2）*/}
+                    <div className="clay-surface-sunken p-4 rounded-2xl space-y-2">
+                      <p className="text-xs font-black text-slate-700 flex items-center gap-1">🔔 到点服药提醒</p>
+                      <p className="text-xs text-slate-500 font-bold leading-relaxed">到药物时间会自动在应用内提醒；开启系统通知后，即使没盯着页面也能收到。</p>
+                      {notifyPerm === 'granted' ? (
+                        <p className="text-xs font-black text-emerald-600">✅ 系统通知已开启</p>
+                      ) : notifyPerm === 'unsupported' ? (
+                        <p className="text-xs font-black text-amber-600">当前环境不支持系统通知（如微信内置浏览器），应用内提醒仍会工作</p>
+                      ) : notifyPerm === 'denied' ? (
+                        <p className="text-xs font-black text-amber-600">系统通知已被拒绝，请在浏览器设置里放行；应用内提醒仍会工作</p>
+                      ) : (
+                        <button onClick={requestNotifyPermission} className="w-full py-2.5 clay-btn-primary text-xs font-black">开启系统通知</button>
+                      )}
+                    </div>
+
+                    {/* 适老化无障碍（Task #6，本机记忆，与妈妈端各自独立） */}
+                    <div className="clay-surface-sunken p-4 rounded-2xl space-y-3">
+                      <p className="text-xs font-black text-slate-700 flex items-center gap-1">♿ 适老化 · 无障碍</p>
+                      <p className="text-xs text-slate-500 font-bold leading-relaxed">调节字号、语音朗读与高对比。设置只作用于当前这台设备，妈妈端可在她的页面里单独调。</p>
+                      <div>
+                        <p className="text-xs font-bold text-slate-500 mb-1.5">显示字号</p>
+                        <div className="grid grid-cols-3 gap-2">
+                          {[['normal','标准'],['large','大'],['huge','超大']].map(([val,label]) => (
+                            <button
+                              key={val}
+                              onClick={() => setA11y({ fontScale: val })}
+                              className={`py-2 rounded-xl text-xs font-black transition-all active:scale-95 border ${
+                                a11y.fontScale === val ? 'bg-rose-500 text-white border-rose-500' : 'bg-white text-slate-600 border-slate-200'}`}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setA11y({ highContrast: !a11y.highContrast })}
+                        className={`w-full py-2.5 rounded-xl text-xs font-black transition-all active:scale-95 border ${
+                          a11y.highContrast ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200'}`}
+                      >
+                        {a11y.highContrast ? '◑ 高对比：已开' : '◐ 高对比：已关'}
+                      </button>
+                      {ttsSupported ? (
+                        <button
+                          onClick={() => setA11y({ voiceOn: !a11y.voiceOn })}
+                          className={`w-full py-2.5 rounded-xl text-xs font-black transition-all active:scale-95 border ${
+                            a11y.voiceOn ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-slate-600 border-slate-200'}`}
+                        >
+                          {a11y.voiceOn ? '🔊 语音朗读：已开' : '🔇 语音朗读：已关'}
+                        </button>
+                      ) : (
+                        <p className="text-xs font-bold text-amber-600">当前环境不支持语音朗读</p>
+                      )}
+                    </div>
+
+                    {/* Mom link generator */}
+                    {familyId !== DEMO_FAMILY_ID && (
+                      <div className="clay-surface-sunken p-4 rounded-2xl space-y-3">
+                        <p className="text-xs font-black text-slate-700 flex items-center gap-1"><Share2 className="w-3.5 h-3.5 text-rose-400" /> {elderCall}专用链接（发给{elderCall}）</p>
+                        {(() => {
+                          const momUrl = `${window.location.origin}${window.location.pathname}?family=${familyId}&viewMode=mom`;
+                          return (
+                            <>
+                              <div className="flex gap-2 items-center">
+                                <code className="flex-1 px-3 py-2 bg-white rounded-xl text-xs text-slate-700 truncate border border-slate-100">{momUrl}</code>
+                                <button onClick={() => { try { navigator.clipboard.writeText(momUrl); showToast(`📋 已复制，去微信发给${elderCall}`); } catch { showToast("复制失败"); } }} className="clay-btn-secondary px-3 py-2 text-xs font-black shrink-0">复制</button>
+                              </div>
+                              <p className="text-xs text-slate-500 font-bold">{elderCall}打开这个链接就是为{elderCall}准备好的大字版药宝，只用点"我吃了"。</p>
+                              <p className="text-xs text-slate-400">
+                                <a href={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(momUrl)}`} target="_blank" rel="noopener" className="underline text-rose-500 font-bold">查看二维码</a> · 让{elderCall}用相机扫描
+                              </p>
+                            </>
+                          );
+                        })()}
+                        {adminPin && (
+                          <details className="text-xs">
+                            <summary className="cursor-pointer text-slate-500 font-bold">查看 admin PIN（用于在新设备上接管）</summary>
+                            <div className="mt-2 flex gap-2 items-center">
+                              <code className="flex-1 px-2 py-1.5 bg-slate-50 rounded text-slate-700">{adminPin}</code>
+                              <button onClick={() => { try { navigator.clipboard.writeText(adminPin); showToast("已复制 PIN"); } catch {} }} className="clay-btn-secondary px-2 py-1 text-xs font-black">复制</button>
+                            </div>
+                            <p className="text-slate-400 mt-1">PIN 自动存在你这台设备上。要在新设备登录这个家庭，需要这个码。</p>
+                          </details>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Family members CRUD */}
+                    <div className="clay-surface-sunken p-4 rounded-2xl space-y-3">
+                      <p className="text-xs font-black text-slate-700">家庭成员</p>
+                      <div className="space-y-2">
+                        {familyMembers.map(m => (
+                          <div key={m.id} className="flex items-center gap-2 bg-white rounded-xl p-2.5 border border-slate-100">
+                            <span className="text-xl">{m.avatar}</span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-black text-slate-700 truncate">{m.relation} {m.name}</p>
+                              <p className="text-xs text-slate-400 truncate">{m.permission || "可查看与留言"}</p>
+                            </div>
+                            <button onClick={() => setFamilyMembers(prev => prev.filter(x => x.id !== m.id))} className="text-slate-300 hover:text-rose-400">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                        {familyMembers.length === 0 && <p className="text-xs text-slate-400 font-bold text-center py-2">还没有家人 — 加一个吧</p>}
+                      </div>
+                      <form onSubmit={(e) => {
+                        e.preventDefault();
+                        const name = (newMemberName || "").trim();
+                        const relation = (newMemberRelation || "").trim();
+                        if (!name) { showToast("名字不能空"); return; }
+                        const nm = { id: Date.now(), name, relation: relation || "家人", avatar: newMemberAvatar || "👤", status: "已绑定", permission: "可查看健康值、服药历史、留言" };
+                        setFamilyMembers(prev => [...prev, nm]);
+                        setNewMemberName(""); setNewMemberRelation(""); setNewMemberAvatar("👤");
+                        showToast("✅ 已添加家庭成员");
+                      }} className="space-y-2">
+                        {/* 注意：sm: 断点看视口不看容器，侧栏只有约 380px，四控件一行会挤成截图里那样 —— 分行 */}
+                        <div className="flex items-center gap-2">
+                          <select value={newMemberAvatar} onChange={e => setNewMemberAvatar(e.target.value)} className="px-2 py-2 clay-input-soft text-base focus:outline-none shrink-0">
+                            {["👩","👨","👧","👦","👴","👵","🧒","👤"].map(em => <option key={em} value={em}>{em}</option>)}
+                          </select>
+                          <input value={newMemberRelation} onChange={e => setNewMemberRelation(e.target.value)} placeholder="关系（如：女儿）" className="flex-1 min-w-0 px-3 py-2.5 clay-input-soft text-xs font-bold focus:outline-none" />
+                        </div>
+                        <input value={newMemberName} onChange={e => setNewMemberName(e.target.value)} placeholder="名字（如：露露）" className="w-full px-3 py-2.5 clay-input-soft text-xs font-bold focus:outline-none" />
+                        <button type="submit" className="w-full clay-btn-primary py-2.5 text-xs font-black">＋ 添加家人</button>
+                      </form>
+                    </div>
+
+                    <div className="bg-amber-50 rounded-2xl p-3 border border-amber-100 text-xs text-amber-700 font-bold leading-relaxed">
+                      💡 在这里把{elderCall}的药品、家人、宠物都准备好，然后把专用链接发给{elderCall} — {elderCall}打开就是大字版的"我吃了"按钮，不需要学新东西。
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            </section>
+
+          </div>
+
+          {/* Achievement Share Modal */}
+          {achievementShare && (
+            <div className="fixed inset-0 z-50 bg-slate-900/25 backdrop-blur-sm flex items-center justify-center p-5">
+              <div className="clay-surface-soft max-w-sm w-full p-6 text-center space-y-4">
+                <div className="mx-auto w-20 h-20 rounded-[2rem] bg-gradient-to-br from-amber-200 to-rose-300 flex items-center justify-center shadow-lg text-4xl pet-float">🏆</div>
+                <div>
+                  <p className="text-xs font-black text-rose-500 tracking-widest uppercase">Community Share Card</p>
+                  <h3 className="text-2xl font-black text-slate-800 mt-1">连续打卡 {achievementShare.days} 天</h3>
+                  <p className="text-sm text-slate-500 font-bold mt-2 leading-relaxed">{achievementShare.pet}已经被你喂得元气满满！这张成就卡可以发给社区，邀请大家一起规律服药。</p>
+                </div>
+                <div className="bg-gradient-to-r from-rose-50 to-amber-50 rounded-2xl p-4 border border-rose-100 text-left">
+                  <p className="text-xs font-black text-slate-700">#药宝打卡挑战</p>
+                  <p className="text-xs text-slate-500 font-semibold mt-1">我和黏土小动物一起完成了 {achievementShare.days} 天服药守护。</p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <button onClick={() => { showToast('分享文案已准备好，可发布到社区'); setAchievementShare(null); }} className="clay-btn-primary py-3 text-sm font-black flex items-center justify-center gap-2"><Share2 className="w-4 h-4" />发给社区</button>
+                  <button onClick={() => setAchievementShare(null)} className="clay-btn-secondary py-3 text-sm font-black text-slate-600">稍后再说</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Create Family modal */}
+          {createFamilyOpen && (
+            <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-5">
+              <div className="clay-surface-soft max-w-md w-full p-6 space-y-4">
+                <div className="text-center space-y-2">
+                  <p className="text-3xl">🏡</p>
+                  <h3 className="text-xl font-black text-slate-800">为{elderCall}创建一个专属家庭</h3>
+                  <p className="text-xs text-slate-500 font-bold leading-relaxed">
+                    系统会生成一个家庭码和一个 admin PIN。<br/>
+                    家庭码 = {elderCall}版链接的一部分；PIN 自动存在你这台设备上。
+                  </p>
+                </div>
+                <div className="bg-rose-50 rounded-2xl p-4 border border-rose-100 text-xs text-rose-700 font-bold leading-relaxed">
+                  ⚠️ PIN 只在你这台设备上保存。要在新设备打开 admin 视角，需要这个 PIN。建议截图保存或抄一份。
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <button onClick={() => setCreateFamilyOpen(false)} className="clay-btn-secondary py-3 text-sm font-black text-slate-600">先不用</button>
+                  <button onClick={async () => {
+                    const newFamily = generateFamilyId();
+                    const newPin = generateAdminPin();
+                    const selectedPetId = (petCollection.find(pet => pet.selected) || selectedPetMeta)?.id;
+                    try {
+                      // 用当前本地配置做种子建库；服务端建表并回吐权威快照
+                      const snap = await cloudCreateFamily(newFamily, newPin, {
+                        displayName: "我们家", elderName: "妈妈",
+                        payload: { selectedPetId, medications, familyMembers, medicalLogs },
+                      });
+                      writeLocalAdminPin(newFamily, newPin);
+                      setFamilyId(newFamily);
+                      setAdminPin(newPin);
+                      applyServerSnapshot(snap, "rpc");
+                      setCreateFamilyOpen(false);
+                      setCurrentTab('settings');
+                      // 修改 URL 不刷新
+                      try {
+                        const u = new URL(window.location.href);
+                        u.searchParams.set('family', newFamily);
+                        u.searchParams.set('as', 'admin');
+                        window.history.replaceState({}, '', u.toString());
+                      } catch {}
+                      showToast(`🏡 家庭已创建！去配置 tab 把${elderCall}版链接发出去`);
+                    } catch (err) {
+                      showToast("创建失败：" + (err.message || ""));
+                    }
+                  }} className="clay-btn-primary py-3 text-sm font-black">立刻创建</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Sticky Bottom Tab Bar - Mobile layout ONLY */}
+          <footer className="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-slate-100 lg:hidden px-6 py-4 flex items-center justify-between z-40 shadow-[0_-8px_24px_rgba(180,190,210,0.15)] rounded-t-[2rem]">
+            <button 
+              onClick={() => setCurrentTab('home')}
+              className={`flex flex-col items-center gap-1.5 transition-all text-xs font-black ${currentTab === 'home' ? 'text-rose-500 scale-105' : 'text-slate-400'}`}
+            >
+              <Smile className="w-5 h-5" />
+              <span>{selectedPet.name}主屏</span>
+            </button>
+
+            <button 
+              onClick={() => setCurrentTab('medication')}
+              className={`flex flex-col items-center gap-1.5 transition-all text-xs font-black ${currentTab === 'medication' ? 'text-rose-500 scale-105' : 'text-slate-400'}`}
+            >
+              <Pill className="w-5 h-5" />
+              <span>安排药片</span>
+            </button>
+
+            <button 
+              onClick={() => setCurrentTab('doctor')}
+              className={`flex flex-col items-center gap-1.5 transition-all text-xs font-black ${currentTab === 'doctor' ? 'text-rose-500 scale-105' : 'text-slate-400'}`}
+            >
+              <ClipboardCheck className="w-5 h-5" />
+              <span>医嘱日记</span>
+            </button>
+
+            <button
+              onClick={() => setCurrentTab('family')}
+              className={`flex flex-col items-center gap-1.5 transition-all text-xs font-black ${currentTab === 'family' ? 'text-rose-500 scale-105' : 'text-slate-400'}`}
+            >
+              <Users className="w-5 h-5" />
+              <span>加点爱</span>
+            </button>
+
+            <button
+              onClick={() => setCurrentTab('settings')}
+              className={`flex flex-col items-center gap-1.5 transition-all text-xs font-black ${currentTab === 'settings' ? 'text-rose-500 scale-105' : 'text-slate-400'}`}
+            >
+              <Settings className="w-5 h-5" />
+              <span>配置</span>
+            </button>
+          </footer>
+
+        </div>
+      );
+    }
+
+    // ErrorBoundary: 任何未捕获错误（如 Three.js 加载失败后 new THREE.Scene()）都不会白屏
+    // 降级显示中文纯文本药单，老人仍能看到药名
+    class ErrorBoundary extends React.Component {
+      constructor(props) { super(props); this.state = { crashed: false }; }
+      static getDerivedStateFromError() { return { crashed: true }; }
+      componentDidCatch(err, info) { console.error("[药宝] App crashed:", err, info); }
+      render() {
+        if (this.state.crashed) {
+          return (
+            <div style={{ minHeight: '100vh', background: '#fff7f0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px', fontFamily: 'sans-serif' }}>
+              <p style={{ fontSize: 48, marginBottom: 16 }}>💊</p>
+              <p style={{ fontSize: 22, fontWeight: 900, color: '#be123c', marginBottom: 12 }}>页面遇到了小问题</p>
+              <p style={{ fontSize: 16, color: '#475569', marginBottom: 24, textAlign: 'center', lineHeight: 1.7 }}>请告诉你的家人，让 ta 来帮你重新打开。<br/>你可以先点下面的按钮试试。</p>
+              <button onClick={() => window.location.reload()} style={{ background: '#f43f5e', color: '#fff', border: 'none', borderRadius: 16, padding: '16px 40px', fontSize: 18, fontWeight: 900, cursor: 'pointer' }}>
+                重新加载 🔄
+              </button>
+            </div>
+          );
+        }
+        return this.props.children;
+      }
+    }
+
+    // Initialize root React app safely inside root tag
+    const container = document.getElementById('root');
+    const root = createRoot(container);
+    root.render(<ErrorBoundary><App /></ErrorBoundary>);
+  </script>
+</body>
+</html>

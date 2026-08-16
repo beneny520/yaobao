@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>药宝 环境验证</title>
+  <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@19.2.0",
+        "react-dom/client": "https://esm.sh/react-dom@19.2.0/client",
+        "three": "https://esm.sh/three@0.128.0",
+        "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.45.4"
+      }
+    }
+  </script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.1/dist/tailwind.min.css" />
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    .status-pending { background: #f1f5f9; color: #64748b; }
+    .status-testing { background: #fef3c7; color: #92400e; animation: pulse 1.5s infinite; }
+    .status-passed { background: #dcfce7; color: #166534; }
+    .status-failed { background: #fee2e2; color: #991b1b; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen">
+  <div id="root"></div>
+  <script type="text/babel" data-type="module">
+    import React, { useState, useEffect, useRef } from "react";
+    import { createRoot } from "react-dom/client";
+    import { createClient } from "@supabase/supabase-js";
+    import * as THREE from "three";
+
+    // 配置（与 clay-buddy.html 一致）
+    const SUPABASE_URL = "https://idxzxnxfcpazdtaossna.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_saKdquYW3UGOcXnYpgvhWA_-M6rOnw4";
+    const AI_ENDPOINT = `${SUPABASE_URL}/functions/v1/yb-ai`;
+
+    // 验证项定义
+    const TEST_ITEMS = [
+      { id: 'mic', label: '🎤 麦克风权限', desc: '微信内能否获取音频流' },
+      { id: 'webgl', label: '🎨 WebGL 渲染', desc: 'Three.js 能否流畅渲染 3D 场景' },
+      { id: 'supabase', label: '🗄️ Supabase 连通', desc: '后端数据库能否正常连接' },
+      { id: 'dashscope', label: '🔑 百炼 Key 配置', desc: 'DashScope API Key 是否已设置' },
+    ];
+
+    // 微信内置浏览器检测：微信 WebView 不给网页麦克风权限，要引导用户去系统浏览器
+    const isWeChat = () => /MicroMessenger/i.test(navigator.userAgent || "");
+
+    // 测试函数
+    const testMic = async () => {
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new DOMException("unsupported", "NotSupportedError");
+        }
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const ctx = new AudioContext();
+        const analyser = ctx.createAnalyser();
+        const source = ctx.createMediaStreamSource(stream);
+        source.connect(analyser);
+        analyser.fftSize = 256;
+        const data = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteFrequencyData(data);
+        const avg = data.reduce((a, b) => a + b, 0) / data.length;
+        stream.getTracks().forEach(t => t.stop());
+        ctx.close();
+        return { passed: true, message: `✓ 音量波动正常 (${avg.toFixed(1)}/255)` };
+      } catch (e) {
+        // 微信内的失败几乎都不是"设置"能解决的，统一引导到系统浏览器
+        const wechatHint = isWeChat()
+          ? "微信内置浏览器不支持网页麦克风。请点右上角 ··· →「在浏览器中打开」（iOS 选「在 Safari 中打开」）后重试"
+          : "";
+        const hints = {
+          NotAllowedError: '请允许麦克风权限（系统设置 → 该浏览器 → 麦克风）',
+          NotFoundError: '未检测到麦克风设备',
+          NotReadableError: '麦克风被占用，或系统未给浏览器麦克风权限',
+          NotSupportedError: '当前浏览器不支持网页麦克风，请用 Safari / Chrome 打开',
+          SecurityError: '非 HTTPS 环境无法使用麦克风',
+          InvalidAccessError: wechatHint || '当前环境拒绝了麦克风，请用系统浏览器（Safari/Chrome）打开本页',
+          TypeError: '当前环境不支持音频获取，请用系统浏览器打开'
+        };
+        const hint = hints[e.name] || '请用系统浏览器（Safari/Chrome）打开本页重试';
+        return { passed: false, message: `${e.name}: ${hint}` };
+      }
+    };
+
+    const testWebGL = async () => {
+      return new Promise((resolve) => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = 300; canvas.height = 300;
+          const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+          const scene = new THREE.Scene();
+          const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+          camera.position.z = 2;
+          const cube = new THREE.Mesh(
+            new THREE.BoxGeometry(1, 1, 1),
+            new THREE.MeshBasicMaterial({ color: 0xf43f5e })
+          );
+          scene.add(cube);
+          let frames = 0; let start = performance.now();
+          const animate = () => {
+            cube.rotation.x += 0.01; cube.rotation.y += 0.01;
+            renderer.render(scene, camera);
+            frames++;
+            if (performance.now() - start >= 1000) {
+              const fps = Math.round(frames * 1000 / (performance.now() - start));
+              renderer.dispose();
+              resolve(fps >= 25
+                ? { passed: true, message: `✓ 流畅渲染 (${fps} fps)` }
+                : { passed: false, message: `⚠ 帧率偏低 (${fps} fps)` }
+              );
+            } else requestAnimationFrame(animate);
+          };
+          animate();
+        } catch (e) {
+          resolve({ passed: false, message: `WebGL 初始化失败: ${e.message}` });
+        }
+      });
+    };
+
+    const testSupabase = async () => {
+      try {
+        const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+        const { data, error } = await sb.from('yb_families').select('id', { count: 'exact', head: true });
+        if (error) throw error;
+        return { passed: true, message: `✓ 连接正常 (家庭数: ${data?.length || 0})` };
+      } catch (e) {
+        return { passed: false, message: `连接失败: ${e.message}` };
+      }
+    };
+
+    const testDashScope = async () => {
+      try {
+        // 使用 demo 家庭码测试（闸门必须通过）
+        const resp = await fetch(AI_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` },
+          body: JSON.stringify({ op: 'chat', code: 'testfam001', text: 'hi' })
+        });
+        const data = await resp.json();
+        if (data.ok === true) return { passed: true, message: '✓ Key 已配置，模型可用' };
+        if (data.error === 'ai_not_configured') return { passed: false, message: '⚠ 未设置 DASHSCOPE_API_KEY（在 Supabase Dashboard → Edge Functions → Secrets 设置）' };
+        if (data.error === 'unknown_family') return { passed: false, message: '⚠ 测试家庭码不存在，请检查数据库' };
+        return { passed: false, message: `模型调用失败: ${data.error}` };
+      } catch (e) {
+        return { passed: false, message: `请求失败: ${e.message}` };
+      }
+    };
+
+    // 主组件
+    function App() {
+      const [results, setResults] = useState({});
+      const [testing, setTesting] = useState(null);
+
+      const runTest = async (id) => {
+        setTesting(id);
+        setResults(prev => ({ ...prev, [id]: { status: 'testing', message: '测试中...' } }));
+        let r;
+        if (id === 'mic') r = await testMic();
+        else if (id === 'webgl') r = await testWebGL();
+        else if (id === 'supabase') r = await testSupabase();
+        else if (id === 'dashscope') r = await testDashScope();
+        setResults(prev => ({ ...prev, [id]: { status: r.passed ? 'passed' : 'failed', message: r.message } }));
+        setTesting(null);
+      };
+
+      const runAll = async () => {
+        for (const t of TEST_ITEMS) {
+          await runTest(t.id);
+          await new Promise(r => setTimeout(r, 300));
+        }
+      };
+
+      const passedCount = Object.values(results).filter(r => r?.status === 'passed').length;
+      const totalCount = TEST_ITEMS.length;
+
+      return (
+        <div className="max-w-lg mx-auto p-4">
+          <h1 className="text-2xl font-black text-slate-800 mb-2">药宝 环境验证</h1>
+          <p className="text-sm text-slate-500 mb-4">在微信内打开此页面，逐项验证环境是否就绪</p>
+
+          {isWeChat() && (
+            <div className="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-300">
+              <p className="font-bold text-amber-800 mb-1">📋 检测到微信内置浏览器</p>
+              <p className="text-sm text-amber-700">语音陪伴、拍照识别在微信内用不了（微信不给网页麦克风/相机权限）。请点右上角 <b>···</b> → <b>「在浏览器中打开」</b>（iOS 选「在 Safari 中打开」）后再测，四项才能真正通过。</p>
+            </div>
+          )}
+
+          {totalCount > 0 && (
+            <div className="mb-6 p-3 rounded-xl bg-white border border-slate-200">
+              <div className="flex justify-between text-sm font-bold text-slate-700 mb-2">
+                <span>总进度</span>
+                <span>{passedCount}/{totalCount} 通过</span>
+              </div>
+              <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-full bg-emerald-500 transition-all duration-300" style={{ width: `${(passedCount / totalCount) * 100}%` }}></div>
+              </div>
+              {passedCount === totalCount && (
+                <p className="text-xs text-emerald-600 font-bold mt-2">🎉 全部通过！可以开始真实用户测试了</p>
+              )}
+            </div>
+          )}
+
+          <div className="flex flex-col gap-3 mb-6">
+            {TEST_ITEMS.map(t => {
+              const r = results[t.id];
+              const status = r?.status || 'pending';
+              return (
+                <div key={t.id} className={`rounded-xl p-4 border ${status === 'passed' ? 'border-emerald-200 bg-emerald-50' : status === 'failed' ? 'border-rose-200 bg-rose-50' : 'bg-white border-slate-200'}`}>
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <h3 className="font-bold text-slate-800">{t.label}</h3>
+                      <p className="text-xs text-slate-500">{t.desc}</p>
+                    </div>
+                    <span className={`text-xs font-black px-2 py-1 rounded-full status-${status}`}>
+                      {status === 'pending' ? '待测' : status === 'testing' ? '测试中' : status === 'passed' ? '✓ 通过' : '✗ 失败'}
+                    </span>
+                  </div>
+                  {r?.message && (
+                    <p className={`text-sm font-mono mt-2 ${status === 'passed' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                      {r.message}
+                    </p>
+                  )}
+                  <button
+                    onClick={() => runTest(t.id)}
+                    disabled={testing === t.id}
+                    className="mt-3 px-4 py-2 text-sm font-bold text-white bg-rose-500 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-transform"
+                  >
+                    {testing === t.id ? '测试中...' : '开始测试'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          <button
+            onClick={runAll}
+            disabled={testing !== null}
+            className="w-full py-3 text-sm font-bold text-white bg-slate-800 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-transform mb-4"
+          >
+            {testing ? '批量测试中...' : '🚀 一键测试全部'}
+          </button>
+
+          <div className="text-xs text-slate-400 space-y-1">
+            <p>• 麦克风测试需在微信内允许权限</p>
+            <p>• WebGL 帧率 ≥25fps 为流畅</p>
+            <p>• 百炼 Key 需在 Supabase Dashboard 手动设置</p>
+            <p>• 全部通过后截图留存备查</p>
+          </div>
+        </div>
+      );
+    }
+
+    createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

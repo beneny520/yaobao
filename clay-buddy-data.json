@@ -1,0 +1,41 @@
+{
+  "selectedPetId": "bunny",
+  "selectedPet": {
+    "id": "bunny",
+    "name": "糖包",
+    "level": 4,
+    "points": 75,
+    "targetPoints": 100,
+    "status": "活力满满",
+    "healthIndex": 85,
+    "lastFeedTime": "早上 08:15",
+    "type": "兔兔"
+  },
+  "streakDays": 6,
+  "medications": [
+    { "id": 1, "name": "倍他乐克（降血压）", "dose": "1片 / 每日一次", "times": ["08:00"], "taken": true, "icon": "💊", "color": "from-amber-200 to-rose-200" },
+    { "id": 2, "name": "养心安神口服液", "dose": "1支 / 温开水冲服", "times": ["13:00", "20:00"], "taken": false, "icon": "🍼", "color": "from-teal-200 to-cyan-200" },
+    { "id": 3, "name": "维生素C 软糖", "dose": "2粒 / 嚼服", "times": ["20:30"], "taken": false, "icon": "🍬", "color": "from-pink-200 to-orange-200" }
+  ],
+  "weeklyHistory": [
+    { "day": "周一", "done": 3, "total": 3 },
+    { "day": "周二", "done": 2, "total": 3 },
+    { "day": "周三", "done": 3, "total": 3 },
+    { "day": "周四", "done": 3, "total": 3 },
+    { "day": "周五", "done": 2, "total": 3 },
+    { "day": "周六", "done": 3, "total": 3 },
+    { "day": "今天", "done": 1, "total": 3 }
+  ],
+  "familyFeed": [
+    { "id": 1, "author": "女儿 露露", "text": "刚刚送来了一杯温水，并留话：『妈妈今天要保重身体，糖包真可爱！』", "time": "20分钟前", "type": "note" },
+    { "id": 2, "author": "儿子 伟强", "text": "查看了宠物的饱腹度。发送了药丸提醒提醒。", "time": "今天 08:30", "type": "inspect" }
+  ],
+  "familyMembers": [
+    { "id": 1, "name": "露露", "relation": "女儿", "avatar": "👩", "status": "已绑定", "permission": "可查看健康值、服药历史、留言" },
+    { "id": 2, "name": "伟强", "relation": "儿子", "avatar": "👦", "status": "已绑定", "permission": "可查看健康值、服药历史、留言" }
+  ],
+  "medicalLogs": [
+    { "id": 1, "hospital": "华山医院心内科", "doctor": "杨医生", "visitDate": "2026-02-21", "followDate": "2026-03-15", "content": "避免空腹服用黄色胶囊，多喝开水。若出现明显头晕，先坐下休息并记录血压。", "tags": ["餐后", "血压", "复诊"] },
+    { "id": 2, "hospital": "社区中医诊所", "doctor": "陈中医", "visitDate": "2026-02-10", "followDate": "2026-04-10", "content": "每天中午吃饱后再喝汤药，注意清淡饮食，少油炸。睡前可温水泡脚 15 分钟。", "tags": ["汤药", "饮食"] }
+  ]
+}
